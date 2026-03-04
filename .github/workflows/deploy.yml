@@ -66,6 +66,8 @@ jobs:
     
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       
       - name: Create .env for Production
         run: |
@@ -82,12 +84,14 @@ jobs:
       - name: Setup FTP Deploy Action
         uses: milanmk/actions-file-deployer@master
         with:
-          remote-url: ${{ secrets.FTP_HOST }}
+          remote-protocol: ftp
+          remote-host: ${{ secrets.FTP_HOST }}
           remote-user: ${{ secrets.FTP_USER }}
           remote-password: ${{ secrets.FTP_PASS }}
-          local-dir: ./
-          remote-dir: /htdocs
-          exclude: |
+          local-path: .
+          remote-path: /htdocs
+          sync: true
+          sync-delta-excludes: |
             .git/
             .gitignore
             .env
