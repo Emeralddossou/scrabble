@@ -26,6 +26,14 @@ ini_set('error_log', $logDir . '/app.log');
 
 session_start();
 
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("[$errno] $errstr in $errfile:$errline");
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode(['error' => 'Erreur serveur']);
+    exit;
+});
+
 function json_error($message, $httpCode = 400, $context = null) {
     if ($context) {
         error_log($message . ' | ' . json_encode($context));
