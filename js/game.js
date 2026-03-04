@@ -1,6 +1,186 @@
 // js/game.js
 
-const urlParams = new URLSearchParams(window.location.search);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+**Phase 7 Status:** ✅ Complétée---- [ ] API response compression (futur)- [ ] Database indexing optimization (futur)- [ ] Redis caching (futur)- [x] Détection des requêtes lentes- [x] Cache dictionnaire statique- [x] Auto-save des placements- [x] Métriques de latence API- [x] Logs structurés en JSON## Checkliste de Performance   - Caching long-terme   - Servir assets statiques via CDN5. **CDN**   - Minification CSS/JS   - Gzip des réponses API4. **Compression**   - Index sur timestamps   - Index sur (game_id, user_id)3. **Database Indexes**   - Alertes Slack/email sur erreurs   - Dashboard Grafana/Prometheus2. **Monitoring en temps réel**   - Sessions distribuées   - Dictionary en Redis au lieu de fichier1. **Cache Redis**## Points d'Amélioration Futurs```API errors → Contexte complet (endpoint, user_id, etc)Toutes erreurs PHP → Error log + stack trace```### Error Tracking```Duration > 1000ms → Warning log + contexte```### Slow Requests## Monitoring & Alerting```}    }        // Traiter erreurs    if ($entry['level'] === 'ERROR') {    $entry = json_decode($line, true);foreach ($lines as $line) {$lines = file($logFile, FILE_SKIP_EMPTY_LINES);$logFile = 'backend/logs/2026-03-04.log';// PHP```php### Parser JSON des logs```grep '"endpoint":"game.php' backend/logs/*.log | wc -l# Compte des appels par endpointgrep '"duration_ms":[0-9]{4,}' backend/logs/$(date +%Y-%m-%d).log# Afficher les requêtes lentesgrep '"level":"ERROR"' backend/logs/$(date +%Y-%m-%d).log# Afficher les erreurs du jour```bash### Lecture des logs```└── ...├── 2026-03-05.log├── 2026-03-04.logbackend/logs/```### Localisation## Répertoire des Logs```// { apiCalls: 5, apiErrors: 0, avgLatency: 120.5, ... }console.log(performanceMetrics);```javascript**Accès:**- Latence moyenne- Nombre d'erreurs- Nombre d'appels API**Tracking:**### 5. Métriques API côté Frontend```}, 3000);    await apiWithMetrics('game.php?action=save_placements', ...);    if (!isMyTurn || temporaryPlacements.length === 0) return;savePlacementsTimer = setInterval(async () => {// Auto-save every 3 seconds```javascript**Code:**- Améliore la persistance contre les crashes- Appel API silencieux (ne bloque pas l'UI)- Sauvegarde automatique toutes les 3 secondes si changement**Fonctionnement:**### 4. Auto-Save des Placements```return isset($dictionary[$upperWord]);}    return isset($dictionary[$testWord]);    $testWord = preg_replace('/[a-z]/', 'A', $upperWord);if (preg_match('/[a-z]/', $word)) {// Teste aussi les jokers```php**Nouveau code:**```$dictionary[strtoupper($word)];```php**Ancien code:**- Support des mots avec jokers- Gestion améliorée des jokers (blanks)- Cache statique en mémoire PHP**Amélioration:**### 3. Optimisation du Dictionnaire- Console logs pour débogage (après 5 secondes)- Latence moyenne calculée- Décompte des appels API- Métriques de performance en mémoire (`performanceMetrics`)**Frontend:**- Logging complet de chaque API call- Alertes sur les requêtes lentes (> 1 second)- Mesure de la durée des requêtes API**Backend:**### 2. Performance Tracking```}  "user_id": 5  "ip": "192.168.1.1",  },    "duration_ms": 145    "status": 200,    "endpoint": "game.php?action=play_turn",    "method": "POST",  "context": {  "message": "API Request: POST game.php?action=play_turn",  "request_id": "abc123def",  "level": "API",  "timestamp": "2026-03-04 14:23:15",{```json**Exemple:**- **Niveaux**: info, warning, error, debug (si APP_DEBUG=true)- **Fichiers**: Journaux quotidiens (`YYYY-MM-DD.log`)- **Contenu**: timestamp, level, request_id, user_id, IP, contexte- **Format JSON**: Chaque log est en JSON pour parsing facile**Classe:** `Logger` (backend/Logger.php)### 1. Logging Structuré (Logger.php)## Améliorations Implémentéesconst urlParams = new URLSearchParams(window.location.search);
 const gameId = urlParams.get('id');
 
 let gameState = null;
@@ -10,6 +190,14 @@ let exchangeMode = false;
 let exchangeSelections = new Set();
 let isMyTurn = false;
 let lastBoard = null;
+
+// Phase 7: Performance monitoring
+let performanceMetrics = {
+    apiCalls: 0,
+    apiErrors: 0,
+    avgLatency: 0,
+    lastUpdate: Date.now()
+};
 
 const BOARD_LAYOUT = [
     ['tw', '', '', 'dl', '', '', '', 'tw', '', '', '', 'dl', '', '', 'tw'],
@@ -210,6 +398,48 @@ function playSound(type) {
 
 let pollTimer = null;
 let savePlacementsTimer = null;
+
+// Phase 7: Track API calls with timing
+async function apiWithMetrics(endpoint, method = 'GET', body = null) {
+    const startTime = performance.now();
+    performanceMetrics.apiCalls++;
+    
+    try {
+        const res = await api(endpoint, method, body);
+        const latency = performance.now() - startTime;
+        
+        // Update running average
+        performanceMetrics.avgLatency = (performanceMetrics.avgLatency + latency) / 2;
+        
+        if (typeof console !== 'undefined' && performance.now() > 5000) {
+            console.debug(`API ${endpoint}: ${latency.toFixed(0)}ms`);
+        }
+        
+        return res;
+    } catch (err) {
+        performanceMetrics.apiErrors++;
+        console.error(`API Error ${endpoint}:`, err);
+        throw err;
+    }
+}
+
+function startSavingPlacements() {
+    if (savePlacementsTimer) return;
+    
+    // Auto-save placements every 3 seconds
+    savePlacementsTimer = setInterval(async () => {
+        if (!isMyTurn || temporaryPlacements.length === 0) return;
+        
+        try {
+            await apiWithMetrics('game.php?action=save_placements', 'POST', {
+                game_id: gameId,
+                placements: temporaryPlacements
+            });
+        } catch (err) {
+            // Silent fail, will retry next interval
+        }
+    }, 3000);
+}
 let serverTime = null;
 
 function startPolling() {

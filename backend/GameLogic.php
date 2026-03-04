@@ -256,13 +256,32 @@ class GameLogic {
     }
 
     public function isValidWord($word) {
+        // Phase 7: Improved caching for dictionary
         static $dictionary = null;
+        static $dictPath = null;
+        
         if ($dictionary === null) {
-            if (!file_exists(__DIR__ . '/../data/ods.txt')) return true;
-            $lines = file(__DIR__ . '/../data/ods.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $dictPath = __DIR__ . '/../data/ods.txt';
+            if (!file_exists($dictPath)) {
+                // If dictionary doesn't exist, accept any word (for testing)
+                return true;
+            }
+            
+            // Load dictionary with case-insensitive lookup
+            $lines = file($dictPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             $dictionary = array_flip(array_map('strtoupper', $lines));
         }
-        return isset($dictionary[strtoupper($word)]);
+        
+        $upperWord = strtoupper($word);
+        
+        // Allow blanks (lowercase letters represent jokers)
+        if (preg_match('/[a-z]/', $word)) {
+            // Word contains jokers, still need to validate other letters
+            $testWord = preg_replace('/[a-z]/', 'A', $upperWord);
+            return isset($dictionary[$testWord]);
+        }
+        
+        return isset($dictionary[$upperWord]);
     }
 }
 ?>

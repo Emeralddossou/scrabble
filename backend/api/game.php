@@ -4,8 +4,14 @@
 require_once '../bootstrap.php';
 require_once '../db.php';
 require_once '../GameLogic.php';
+require_once '../Logger.php';
+require_once '../env.php';
 
 header('Content-Type: application/json');
+
+// Phase 7: Performance tracking
+$startTime = microtime(true);
+$logger = Logger::getInstance();
 
 if (!isset($_SESSION['user_id'])) {
     json_error('Unauthorized', 401);
@@ -672,5 +678,19 @@ if ($action === 'invite') {
     $stmt = $pdo->prepare("SELECT m.*, u.username FROM moves m LEFT JOIN users u ON m.user_id = u.id WHERE m.game_id = ? ORDER BY id ASC");
     $stmt->execute([$game_id]);
     echo json_encode(['moves' => $stmt->fetchAll()]);
+}
+
+// Phase 7: Log API request performance
+$endTime = microtime(true);
+$duration = ($endTime - $startTime) * 1000; // milliseconds
+$logger->logApiRequest('game.php', $_SERVER['REQUEST_METHOD'], 200, $duration);
+
+// Log slow requests (> 1 second)
+if ($duration > 1000) {
+    $logger->warning('Slow API request', [
+        'action' => $action,
+        'duration_ms' => $duration,
+        'game_id' => $_GET['id'] ?? $_POST['game_id'] ?? null
+    ]);
 }
 ?>
