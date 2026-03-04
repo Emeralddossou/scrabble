@@ -91,18 +91,7 @@ jobs:
           local-path: .
           remote-path: /htdocs
           sync: delta
-          sync-delta-excludes: |
-            .git/
-            .gitignore
-            .env
-            .env.example
-            data/*.db
-            backend/logs/
-            .vscode/
-            .github/
-            node_modules/
-            vendor/
-            .gitattributes
+          sync-delta-excludes: .git/ .gitignore .env .env.example data/*.db backend/logs/ .vscode/ .github/ node_modules/ vendor/ .gitattributes
       
       - name: Deploy Summary
         if: success()
