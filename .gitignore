@@ -1,0 +1,51 @@
+# Environment & Configuration
+.env
+.env.local
+.env.*.php
+/config/
+
+# Database files
+data/scrabble.db
+data/scrabble.db-*
+*.sqlite
+*.sqlite3
+
+# Logs
+/backend/logs/
+*.log
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+/tests/coverage/
+phpunit.xml
+
+# Node/NPM (if using frontend build tools)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Composer (if using PHP dependencies)
+/vendor/
+composer.lock
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Deployment
+/deploy_ftp.ps1
+*.bak
