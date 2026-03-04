@@ -198,3 +198,4 @@ MIT License - Voir `LICENSE` pour détails
 ---
 
 Développé par [Votre nom/équipe] 🎮
+"?? Scrabble en ligne!" 
