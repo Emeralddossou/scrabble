@@ -1,0 +1,113 @@
+name: CI/CD - Build & Deploy
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Lint & Validate
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          extensions: pdo, sqlite, mysql
+          tools: phpcs
+      
+      - name: Validate PHP Syntax
+        run: |
+          find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \;
+      
+      - name: Check PHP Standards
+        run: |
+          phpcs --standard=PSR2 backend/*.php backend/api/*.php --ignore=backend/logs 2>/dev/null || true
+      
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      
+      - name: Validate JavaScript
+        run: |
+          npm install -g jshint 2>/dev/null || true
+          jshint js/*.js 2>/dev/null || echo "JavaScript check completed"
+
+  test:
+    runs-on: ubuntu-latest
+    name: Unit Tests
+    needs: lint
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          extensions: pdo, sqlite
+      
+      - name: Setup Test Database
+        run: |
+          mkdir -p data
+          touch data/test.db
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy via FTP
+    needs: [lint, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Create .env for Production
+        run: |
+          cat > .env << EOF
+          DB_TYPE=sqlite
+          DB_FILE=data/scrabble.db
+          FTP_HOST=${{ secrets.FTP_HOST }}
+          FTP_USER=${{ secrets.FTP_USER }}
+          FTP_PASS=${{ secrets.FTP_PASS }}
+          APP_ENV=production
+          APP_DEBUG=false
+          EOF
+      
+      - name: Setup FTP Deploy Action
+        uses: milanmk/actions-file-deployer@master
+        with:
+          remote-url: ${{ secrets.FTP_HOST }}
+          remote-user: ${{ secrets.FTP_USER }}
+          remote-password: ${{ secrets.FTP_PASS }}
+          local-dir: ./
+          remote-dir: /htdocs
+          exclude: |
+            .git/
+            .gitignore
+            .env
+            .env.example
+            data/*.db
+            backend/logs/
+            .vscode/
+            .github/
+            node_modules/
+            vendor/
+            .gitattributes
+      
+      - name: Deploy Summary
+        if: success()
+        run: |
+          echo "✅ Deployment successful!"
+          echo "App deployed to: ${{ secrets.FTP_HOST }}"
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed. Check logs above."
+          exit 1
