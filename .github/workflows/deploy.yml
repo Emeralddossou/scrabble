@@ -86,12 +86,13 @@ jobs:
         with:
           remote-protocol: ftp
           remote-host: ${{ secrets.FTP_HOST }}
+          remote-port: 21
           remote-user: ${{ secrets.FTP_USER }}
           remote-password: ${{ secrets.FTP_PASS }}
           local-path: .
           remote-path: /htdocs
-          sync: delta
-          sync-delta-excludes: .git/ .gitignore .env .env.example data/*.db backend/logs/ .vscode/ .github/ node_modules/ vendor/ .gitattributes
+          sync: full
+          ftp-options: --ignore-time --allow-empty-file
       
       - name: Deploy Summary
         if: success()
