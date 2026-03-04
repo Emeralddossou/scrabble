@@ -64,7 +64,7 @@ try {
             board LONGTEXT COMMENT 'JSON string of the board',
             bag LONGTEXT COMMENT 'JSON string of tiles in bag',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_move_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             ended_at TIMESTAMP NULL,
             consecutive_passes INTEGER DEFAULT 0,
