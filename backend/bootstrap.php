@@ -1,7 +1,17 @@
 <?php
 // backend/bootstrap.php
 
+// Setup error logging first
+error_reporting(E_ALL);
+@mkdir(__DIR__ . DIRECTORY_SEPARATOR . 'logs', 0777, true);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', __DIR__ . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR . 'app.log');
+
+error_log("=== Bootstrap started ===");
+
 $isSecure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+
 if (getenv('APP_ENV') === 'prod' && !$isSecure) {
     header('Content-Type: application/json');
     http_response_code(403);
@@ -15,14 +25,6 @@ session_set_cookie_params([
     'secure' => $isSecure
 ]);
 ini_set('session.gc_maxlifetime', '604800'); // 7 days
-
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
-$logDir = __DIR__ . '/logs';
-if (!is_dir($logDir)) {
-    @mkdir($logDir, 0755, true);
-}
-ini_set('error_log', $logDir . '/app.log');
 
 session_start();
 
@@ -63,8 +65,25 @@ function require_csrf() {
 
 function maybe_cleanup($pdo) {
     if (rand(1, 100) !== 1) return; // 1% chance per request
-    $pdo->exec("DELETE FROM invitations WHERE created_at < datetime('now', '-7 days')");
-    $pdo->exec("DELETE FROM games WHERE status = 'finished' AND ended_at IS NOT NULL AND ended_at < datetime('now', '-30 days')");
-    $pdo->exec("DELETE FROM password_resets WHERE expires_at < datetime('now')");
+    
+    // Detect database type
+    try {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $isMySQL = ($driver === 'mysql');
+    } catch (Exception $e) {
+        $isMySQL = false;
+    }
+    
+    if ($isMySQL) {
+        // MySQL syntax
+        $pdo->exec("DELETE FROM invitations WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
+        $pdo->exec("DELETE FROM games WHERE status = 'finished' AND ended_at IS NOT NULL AND ended_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        $pdo->exec("DELETE FROM password_resets WHERE expires_at < NOW()");
+    } else {
+        // SQLite syntax
+        $pdo->exec("DELETE FROM invitations WHERE created_at < datetime('now', '-7 days')");
+        $pdo->exec("DELETE FROM games WHERE status = 'finished' AND ended_at IS NOT NULL AND ended_at < datetime('now', '-30 days')");
+        $pdo->exec("DELETE FROM password_resets WHERE expires_at < datetime('now')");
+    }
 }
 ?>

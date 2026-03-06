@@ -51,11 +51,18 @@ git push -u origin main
 
 2. Cliquer **"New repository secret"** et ajouter:
 
-| Nom | Valeur |
-|-----|--------|
-| `FTP_HOST` | ftpupload.net |
-| `FTP_USER` | if0_41143538 |
-| `FTP_PASS` | votre_mot_de_passe |
+| Nom | Valeur | Exemple |
+|-----|--------|----------|
+| `FTP_HOST` | ftpupload.net | Serveur FTP |
+| `FTP_USER` | if0_41143538 | Utilisateur FTP |
+| `FTP_PASS` | votre_mot_de_passe | Mot de passe FTP |
+| `DB_HOST` | db.example.com | Serveur MySQL production |
+| `DB_PORT` | 3306 | Port MySQL |
+| `DB_USER` | scrabble_prod | Utilisateur MySQL |
+| `DB_PASS` | secure_password | Mot de passe MySQL |
+| `DB_NAME` | scrabble_prod | Nom de la base |
+
+**Note:** Assurez-vous que l'utilisateur MySQL a les permissions pour créer des tables et accéder à la base.
 
 3. Click "Add secret" après chacun
 

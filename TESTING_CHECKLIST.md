@@ -48,16 +48,24 @@
 
 ## ✅ Phase 3 MySQL Support
 
-### SQLite (local dev)
-- [ ] Configuration `.env` avec `DB_TYPE=sqlite`
-- [ ] Créer nouvelle partie → BD créée automatiquement
-- [ ] Vérifier tables dans `data/scrabble.db`
-
-### MySQL (si serveur MySQL local)
-- [ ] Configuration `.env` avec MySQL credentials
-- [ ] Relancer app
-- [ ] Vérifier tables créées dans `scrabble` database
+### MySQL (obligatoire - production et dev)
+- [ ] MySQL installé et actif (`mysql -u root` sans erreur)
+- [ ] Base `scrabble` créée avec `charset utf8mb4`
+- [ ] Utilisateur `scrabble_user` créé avec mot de passe `scrabble_password`
+- [ ] Configuration `.env` avec:
+  - `DB_TYPE=mysql`
+  - `DB_HOST=localhost`
+  - `DB_USER=scrabble_user`
+  - `DB_PASS=scrabble_password`
+  - `DB_NAME=scrabble`
+- [ ] Relancer app, pas d'erreurs de connexion
+- [ ] Créer nouvelle partie → tables créées automatiquement
+- [ ] Vérifier tables en base: `mysql -u scrabble_user -p scrabble -e "SHOW TABLES;"`
 - [ ] Jouer partie, vérifier données en base
+
+### SQLite (optionnel - legacy)
+- [ ] Fonctionnel pour développement, mais MySQL préféré
+- [ ] `DB_TYPE=sqlite` + `DB_FILE=data/scrabble.db` pour fallback
 
 ## ✅ Phase 4 Configuration .env
 

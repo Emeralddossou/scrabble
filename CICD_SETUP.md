@@ -11,12 +11,16 @@ GitHub Actions a besoin des identifiants FTP pour déployer. Vous devez les ajou
 1. Allez sur: `https://github.com/Emeralddossou/scrabble/settings/secrets/actions`
 2. Cliquez sur **"New repository secret"** pour chacun:
 
-| Nom | Valeur | Exemple |
-|-----|--------|---------|
-| `FTP_HOST` | Serveur FTP | `ftpupload.net` |
-| `FTP_USER` | Utilisateur FTP | `if0_41143538` |
-| `FTP_PASS` | Mot de passe FTP | `votre_mot_de_passe` |
-| `DB_PASS` | (Optionnel) Mot de passe MySQL production | Si vous migrez vers MySQL |
+| Nom | Valeur | Exemple | Obligatoire |
+|-----|--------|---------|-------------|
+| `FTP_HOST` | Serveur FTP | `ftpupload.net` | Oui |
+| `FTP_USER` | Utilisateur FTP | `if0_41143538` | Oui |
+| `FTP_PASS` | Mot de passe FTP | `votre_mot_de_passe` | Oui |
+| `DB_HOST` | Serveur MySQL production | `db.example.com` | Oui |
+| `DB_PORT` | Port MySQL | `3306` | Oui |
+| `DB_USER` | Utilisateur MySQL production | `scrabble_prod` | Oui |
+| `DB_PASS` | Mot de passe MySQL production | `secure_password` | Oui |
+| `DB_NAME` | Nom de la base MySQL | `scrabble_prod` | Oui |
 
 ## 2. Structure du Workflow
 
@@ -28,7 +32,8 @@ Le fichier `.github/workflows/deploy.yml` exécute 3 étapes:
 - S'exécute sur chaque push et PR
 
 ### Phase 2: **Tests** (Test Units)
-- Initialise la base SQLite test
+- Configure la base MySQL test
+- Initialise le schéma de la base
 - (Ajouter vos tests unitaires ici)
 - Dépend du Lint
 

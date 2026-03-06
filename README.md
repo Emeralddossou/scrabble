@@ -24,12 +24,11 @@ backend/
   │   ├── auth.php           - Authentification
   │   └── game.php           - API de jeu
   ├── GameLogic.php          - Validation, scoring
-  ├── db.php                 - Connexion BD (SQLite/MySQL)
+  ├── db.php                 - Connexion BD (MySQL par défaut)
   ├── bootstrap.php          - Config, sécurité
   └── env.php                - Chargement .env
 
 data/
-  ├── scrabble.db            - Base SQLite (dev)
   └── ods.txt                - Dictionnaire français Scrabble
 ```
 
@@ -37,7 +36,7 @@ data/
 
 ### 1. Prérequis
 - PHP 7.4+
-- SQLite3 OU MySQL 5.7+
+- **MySQL 5.7+** (obligatoire)
 - Navigateur moderne
 
 ### 2. Clone & Setup
@@ -49,33 +48,30 @@ cd scrabble
 # Copier la config d'exemple
 cp .env.example .env
 
-# Configurer .env (optionnel pour SQLite, obligatoire pour MySQL)
+# Configurer .env (obligatoire)
 nano .env
-```
 
-### 3. Configuration .env
-
-**Pour SQLite (développement local):**
-```env
-DB_TYPE=sqlite
-DB_FILE=data/scrabble.db
-```
-
-**Pour MySQL (production):**
+**Configuration MySQL (développement et production):**
 ```env
 DB_TYPE=mysql
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=scrabble_user
-DB_PASS=votre_mot_de_passe_securise
+DB_PASS=scrabble_password
 DB_NAME=scrabble
+APP_ENV=development
+APP_DEBUG=true
 ```
+
+> **Note:** Le fichier `.env` n'est **JAMAIS** commité. Il est dans `.gitignore` pour des raisons de sécurité.
+> Pour la production, les variables sont stockées dans GitHub Secrets.
 
 ### 4. Initialisation BD
 
-Les tables sont créées automatiquement au premier accès. Assurez-vous que:
-- Le répertoire `data/` est writable (pour SQLite)
-- Les credentials MySQL sont valides
+Les tables MySQL sont créées automatiquement au premier accès. Assurez-vous que :
+- MySQL est installé et actif
+- Les credentials dans `.env` sont valides
+- La base de données `scrabble` existe
 
 ## Development
 
@@ -118,7 +114,11 @@ Configuration: `.github/workflows/deploy.yml`
 - `FTP_HOST`
 - `FTP_USER`
 - `FTP_PASS`
-- `DB_PASS` (pour migration prod si MySQL)
+- `DB_HOST` (serveur MySQL prod)
+- `DB_PORT` (port MySQL)
+- `DB_USER` (utilisateur MySQL prod)
+- `DB_PASS` (mot de passe MySQL prod)
+- `DB_NAME` (nom de la base MySQL prod)
 
 ### Déploiement Manuel
 
@@ -128,10 +128,11 @@ PowerShell script pour upload FTP:
 # Vous sera demandé: FTP password
 ```
 
-## Base de Données
+### Base de Données
 
-### Schéma Principal
+La base de données est **MySQL obligatoirement**. Pour les installations héritées avec SQLite, le code supporte toujours SQLite mais MySQL est préféré.
 
+**Schéma Principal:**
 ```sql
 users          - Comptes joueurs
 games          - Instances de parties
@@ -140,12 +141,6 @@ moves          - Historique des coups
 invitations    - Invitations en attente
 password_resets- Tokens réinitialisation
 ```
-
-### Migration SQLite → MySQL
-
-La base de données est compatible avec les deux. Simplement:
-1. Configurer MySQL dans `.env`
-2. Recharger l'app - les tables se créeront automatiquement
 
 ## Tests
 

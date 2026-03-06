@@ -4,7 +4,7 @@
 require_once __DIR__ . '/env.php';
 
 // Get database configuration from .env
-$db_type = strtolower(getEnv('DB_TYPE', 'sqlite'));
+$db_type = strtolower(getEnv('DB_TYPE', 'mysql'));
 $pdo = null;
 
 try {
@@ -28,12 +28,20 @@ try {
         $pdo->exec("USE `$db_name`");
     } else {
         // SQLite Connection (default)
-        $db_file = getEnv('DB_FILE', dirname(__DIR__) . '/data/scrabble.db');
-        $db_dir = dirname($db_file);
-        if (!is_dir($db_dir)) {
-            mkdir($db_dir, 0755, true);
+        // Workaround: hardcode the path directly
+        $dbFile = 'd:\CODE\scrabble\data\scrabble.db';
+        
+        error_log("Using hardcoded SQLite path: " . $dbFile);
+        
+        $dbDir = dirname($dbFile);
+        if (!is_dir($dbDir)) {
+            error_log("Creating dir: " . $dbDir);
+            @mkdir($dbDir, 0777, true);
         }
-        $pdo = new PDO("sqlite:$db_file");
+        
+        error_log("Connecting to: sqlite:" . $dbFile);
+        $pdo = new PDO("sqlite:" . $dbFile);
+        error_log("SQLite connection OK");
         $pdo->exec("PRAGMA foreign_keys = ON;");
     }
     
@@ -46,14 +54,14 @@ try {
     
     $commands = [
         "CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             username VARCHAR(255) UNIQUE NOT NULL,
             password_hash VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )",
         "CREATE TABLE IF NOT EXISTS games (
-            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             status VARCHAR(50) DEFAULT 'waiting' COMMENT 'waiting, active, finished',
             mode VARCHAR(50) DEFAULT 'free' COMMENT 'free, timer',
             is_solo INTEGER DEFAULT 0,
@@ -83,7 +91,7 @@ try {
             FOREIGN KEY (user_id) REFERENCES users(id)
         )",
         "CREATE TABLE IF NOT EXISTS moves (
-            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             game_id INTEGER NOT NULL,
             user_id INTEGER,
             word VARCHAR(255),
@@ -96,7 +104,7 @@ try {
             FOREIGN KEY (user_id) REFERENCES users(id)
         )",
         "CREATE TABLE IF NOT EXISTS invitations (
-            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             from_user_id INTEGER NOT NULL,
             to_user_id INTEGER NOT NULL,
             status VARCHAR(50) DEFAULT 'pending' COMMENT 'pending, accepted, declined',
@@ -108,7 +116,7 @@ try {
             FOREIGN KEY (to_user_id) REFERENCES users(id)
         )",
         "CREATE TABLE IF NOT EXISTS password_resets (
-            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             token VARCHAR(255) UNIQUE,
             expires_at TIMESTAMP NULL,
@@ -121,6 +129,7 @@ try {
     foreach ($commands as $command) {
         // Adjust for SQLite if needed
         if ($db_type === 'sqlite') {
+            error_log("Original SQL: " . substr($command, 0, 80) . "...");
             $command = str_replace('AUTO_INCREMENT', 'AUTOINCREMENT', $command);
             $command = str_replace('LONGTEXT', 'TEXT', $command);
             $command = str_replace("COMMENT 'JSON", "-- JSON", $command);
@@ -128,6 +137,7 @@ try {
             $command = preg_replace("/\s+ON UPDATE CURRENT_TIMESTAMP/", '', $command);
             $command = preg_replace("/\s+CHARACTER SET .*/", '', $command);
             $command = preg_replace("/\s+COLLATE .*/", '', $command);
+            error_log("Converted SQL: " . substr($command, 0, 80) . "...");
         }
         
         try {
@@ -204,7 +214,10 @@ try {
     }
 
 } catch (PDOException $e) {
-    echo "Connection failed: " . $e->getMessage();
+    error_log("Database connection error: " . $e->getMessage());
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode(['error' => 'Erreur serveur: ' . $e->getMessage()]);
     exit;
 }
 ?>

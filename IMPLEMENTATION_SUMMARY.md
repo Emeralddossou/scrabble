@@ -55,33 +55,55 @@
 - `dashboard.php` - Bouton + modal solo
 - `js/app.js` - Fonctions `createSoloGame()`, `openSoloModal()`
 
-### Phase 3: Migration SQLite ↔ MySQL ✅
-**Support dual-DB, configurable par .env**
+### Phase 3: Migration vers MySQL (Obligatoire) ✅
+**Base de données MySQL par défaut, SQLite optionnel legacy**
 
-- `DB_TYPE=sqlite` OU `DB_TYPE=mysql`
+- `DB_TYPE=mysql` par défaut (SQLite optionnel)
 - Auto-création tables & migrations
-- Schéma identique pour les deux
-- Prêt pour production MySQL
+- Schéma identique pour les deux (compatibility)
+- Production-ready MySQL
 
 **Fichiers modifiés:**
-- `backend/env.php` - Nouveau, charge .env
-- `backend/db.php` - Refactors complet, support dual
-- Tables gérent INT vs AUTOINCREMENT, LONGTEXT vs TEXT
+- `backend/env.php` - Charge .env
+- `backend/db.php` - Support MySQL/SQLite dual, MySQL par défaut
+- `backend/bootstrap.php` - Cleanup compatible MySQL/SQLite
+- `backend/cron/cleanup.php` - Cleanup compatible MySQL/SQLite
+- `.github/workflows/deploy.yml` - MySQL setup pour tests
+
+**Changements de configuration:**
+```env
+# Avant (SQLite)
+DB_TYPE=sqlite
+DB_FILE=data/scrabble.db
+
+# Maintenant (MySQL obligatoire)
+DB_TYPE=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=scrabble_user
+DB_PASS=scrabble_password
+DB_NAME=scrabble
+```
 
 ### Phase 4: Configuration .env ✅
 **Sécurité: Credentials en variables d'environnement**
 
-- `.env.example` - Template (IN GIT)
+- `.env.example` - Template MySQL (IN GIT)
 - `.env` - Actual credentials (NOT in git)
 - `.gitignore` - Exclut `.env`, logs, DB files
 - `backend/env.php` - Parser .env simple
 
-**Template:**
-```
-DB_TYPE=sqlite
-DB_FILE=data/scrabble.db
+**Template (MySQL obligatoire):**
+```env
+DB_TYPE=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=scrabble_user
+DB_PASS=scrabble_password
+DB_NAME=scrabble
 FTP_HOST=ftpupload.net
 APP_ENV=development
+APP_DEBUG=false
 ```
 
 ### Phase 5: Git Initialization ✅
@@ -146,7 +168,7 @@ APP_ENV=development
 **Checklist complète:** `TESTING_CHECKLIST.md`
 - Tous les 5 bugs à valider
 - Solo mode gameplay
-- SQLite/MySQL switching
+- MySQL support (SQLite fallback)
 - Cross-device testing
 - Performance baselines
 
@@ -171,7 +193,6 @@ scrabble/
 │   ├── cron/cleanup.php
 │   └── logs/                   # Automatic logs folder
 ├── data/
-│   ├── scrabble.db             # SQLite (dev)
 │   └── ods.txt                 # French dictionary
 ├── js/
 │   ├── app.js                  # ✨ MODIFIED: solo mode functions
@@ -272,16 +293,37 @@ git push -u origin main
 
 ## 📝 Configuration Finale Requise
 
-Avant de lancer en production:
+Avant de lancer en production :
 
-1. **GitHub Secrets** (3 requis):
+1. **GitHub Secrets** (8 requis pour production MySQL) :
    - `FTP_HOST`
    - `FTP_USER`
    - `FTP_PASS`
+   - `DB_HOST` (serveur MySQL prodution)
+   - `DB_PORT` (port MySQL)
+   - `DB_USER` (utilisateur MySQL)
+   - `DB_PASS` (mot de passe MySQL)
+   - `DB_NAME` (nom de la base)
 
-2. **.env Production** (sur serveur):
+2. **.env Local (développement) :**
+   ```env
+   DB_TYPE=mysql
+   DB_HOST=localhost
+   DB_USER=scrabble_user
+   DB_PASS=scrabble_password
+   DB_NAME=scrabble
+   APP_ENV=development
+   APP_DEBUG=true
    ```
-   DB_TYPE=sqlite # ou mysql
+
+3. **.env Production** (MySQL obligatoire) :
+   ```env
+   DB_TYPE=mysql
+   DB_HOST={DB_HOST}
+   DB_PORT={DB_PORT}
+   DB_USER={DB_USER}
+   DB_PASS={DB_PASS}
+   DB_NAME={DB_NAME}
    APP_ENV=production
    APP_DEBUG=false
    ```
