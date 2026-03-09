@@ -9,8 +9,13 @@ function setCsrf(token) {
     sessionStorage.setItem('csrf_token', token);
 }
 
-async function ensureCsrf() {
-    if (csrfToken) return;
+function clearCsrf() {
+    csrfToken = '';
+    sessionStorage.removeItem('csrf_token');
+}
+
+async function ensureCsrf(force = false) {
+    if (csrfToken && !force) return;
     const res = await api('auth.php?action=csrf');
     if (res && res.csrf) setCsrf(res.csrf);
 }
@@ -33,7 +38,11 @@ async function api(endpoint, method = 'GET', body = null) {
         const res = await fetch(`${API_BASE}/${endpoint}`, options);
         const text = await res.text();
         try {
-            return JSON.parse(text);
+            const data = JSON.parse(text);
+            if (data && data.error && /csrf/i.test(data.error)) {
+                clearCsrf();
+            }
+            return data;
         } catch (e) {
             console.error("API invalid JSON:", text);
             throw e;
@@ -153,7 +162,7 @@ if (toggleLoginBtn && toggleRegisterBtn) {
 }
 
 if (loginForm || registerForm) {
-    ensureCsrf();
+    ensureCsrf(true);
 }
 
 if (toggleResetBtn && resetForm) {
@@ -277,6 +286,7 @@ async function checkAuth() {
 async function logout() {
     await ensureCsrf();
     await api('auth.php?action=logout', 'POST');
+    clearCsrf();
     window.location.href = 'index.php';
 }
 

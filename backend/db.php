@@ -9,29 +9,39 @@ $pdo = null;
 
 try {
     if ($db_type === 'mysql') {
-        // MySQL Connection
-        $db_host = getEnv('DB_HOST', 'localhost');
-        $db_port = getEnv('DB_PORT', '3306');
-        $db_user = getEnv('DB_USER', '');
-        $db_pass = getEnv('DB_PASS', '');
-        $db_name = getEnv('DB_NAME', 'scrabble');
-        
-        if (!$db_user) {
-            throw new Exception('MySQL credentials not configured in .env');
+        try {
+            // MySQL Connection
+            $db_host = getEnv('DB_HOST', 'localhost');
+            $db_port = getEnv('DB_PORT', '3306');
+            $db_user = getEnv('DB_USER', '');
+            $db_pass = getEnv('DB_PASS', '');
+            $db_name = getEnv('DB_NAME', 'scrabble');
+            
+            if (!$db_user) {
+                throw new Exception('MySQL credentials not configured in .env');
+            }
+            
+            $dsn = "mysql:host=$db_host;port=$db_port;charset=utf8mb4";
+            $pdo = new PDO($dsn, $db_user, $db_pass);
+            
+            // Create database if not exists
+            $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $pdo->exec("USE `$db_name`");
+        } catch (Exception $e) {
+            error_log("MySQL connection failed, falling back to SQLite: " . $e->getMessage());
+            $db_type = 'sqlite';
         }
+    }
+
+    if ($db_type !== 'mysql') {
+        // SQLite Connection (fallback or explicit)
+        $dbFile = getEnv('DB_FILE', dirname(__DIR__) . '/data/scrabble.db');
+        if (!preg_match('/^([A-Za-z]:)?[\/\\\\]/', $dbFile)) {
+            $dbFile = dirname(__DIR__) . '/' . ltrim($dbFile, '/\\');
+        }
+        $dbFile = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $dbFile);
         
-        $dsn = "mysql:host=$db_host;port=$db_port;charset=utf8mb4";
-        $pdo = new PDO($dsn, $db_user, $db_pass);
-        
-        // Create database if not exists
-        $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $pdo->exec("USE `$db_name`");
-    } else {
-        // SQLite Connection (default)
-        // Workaround: hardcode the path directly
-        $dbFile = 'd:\CODE\scrabble\data\scrabble.db';
-        
-        error_log("Using hardcoded SQLite path: " . $dbFile);
+        error_log("Using SQLite path: " . $dbFile);
         
         $dbDir = dirname($dbFile);
         if (!is_dir($dbDir)) {
@@ -52,29 +62,102 @@ try {
     // CREATE TABLES
     // =================
     
-    $commands = [
+    $mysqlCommands = [
         "CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
             username VARCHAR(255) UNIQUE NOT NULL,
             password_hash VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )",
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         "CREATE TABLE IF NOT EXISTS games (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
             status VARCHAR(50) DEFAULT 'waiting' COMMENT 'waiting, active, finished',
             mode VARCHAR(50) DEFAULT 'free' COMMENT 'free, timer',
-            is_solo INTEGER DEFAULT 0,
-            time_limit INTEGER DEFAULT 0 COMMENT 'in minutes',
-            increment INTEGER DEFAULT 0 COMMENT 'in seconds',
-            current_player_id INTEGER,
-            winner_id INTEGER,
+            is_solo TINYINT DEFAULT 0,
+            time_limit INT DEFAULT 0 COMMENT 'in minutes',
+            increment INT DEFAULT 0 COMMENT 'in seconds',
+            current_player_id INT,
+            winner_id INT,
             board LONGTEXT COMMENT 'JSON string of the board',
             bag LONGTEXT COMMENT 'JSON string of tiles in bag',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_move_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             ended_at TIMESTAMP NULL,
+            consecutive_passes INT DEFAULT 0,
+            FOREIGN KEY (current_player_id) REFERENCES users(id),
+            FOREIGN KEY (winner_id) REFERENCES users(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS game_players (
+            game_id INT NOT NULL,
+            user_id INT NOT NULL,
+            score INT DEFAULT 0,
+            rack LONGTEXT COMMENT 'JSON string of tiles in hand',
+            time_remaining INT COMMENT 'in seconds',
+            turn_order INT COMMENT '1 or 2',
+            PRIMARY KEY (game_id, user_id),
+            FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS moves (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            game_id INT NOT NULL,
+            user_id INT,
+            word VARCHAR(255),
+            points INT,
+            coordinates LONGTEXT COMMENT 'JSON coordinates',
+            move_type VARCHAR(50) DEFAULT 'play',
+            details LONGTEXT COMMENT 'JSON details',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS invitations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            from_user_id INT NOT NULL,
+            to_user_id INT NOT NULL,
+            status VARCHAR(50) DEFAULT 'pending' COMMENT 'pending, accepted, declined',
+            mode VARCHAR(50) DEFAULT 'free',
+            time_limit INT DEFAULT 15,
+            increment INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (from_user_id) REFERENCES users(id),
+            FOREIGN KEY (to_user_id) REFERENCES users(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS password_resets (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            token VARCHAR(255) UNIQUE,
+            expires_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    ];
+
+    $sqliteCommands = [
+        "CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+        )",
+        "CREATE TABLE IF NOT EXISTS games (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            status TEXT DEFAULT 'waiting',
+            mode TEXT DEFAULT 'free',
+            is_solo INTEGER DEFAULT 0,
+            time_limit INTEGER DEFAULT 0,
+            increment INTEGER DEFAULT 0,
+            current_player_id INTEGER,
+            winner_id INTEGER,
+            board TEXT,
+            bag TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_move_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ended_at DATETIME NULL,
             consecutive_passes INTEGER DEFAULT 0,
             FOREIGN KEY (current_player_id) REFERENCES users(id),
             FOREIGN KEY (winner_id) REFERENCES users(id)
@@ -83,9 +166,9 @@ try {
             game_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
             score INTEGER DEFAULT 0,
-            rack LONGTEXT COMMENT 'JSON string of tiles in hand',
-            time_remaining INTEGER COMMENT 'in seconds',
-            turn_order INTEGER COMMENT '1 or 2',
+            rack TEXT,
+            time_remaining INTEGER,
+            turn_order INTEGER,
             PRIMARY KEY (game_id, user_id),
             FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id)
@@ -94,12 +177,12 @@ try {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             game_id INTEGER NOT NULL,
             user_id INTEGER,
-            word VARCHAR(255),
+            word TEXT,
             points INTEGER,
-            coordinates LONGTEXT COMMENT 'JSON coordinates',
-            move_type VARCHAR(50) DEFAULT 'play',
-            details LONGTEXT COMMENT 'JSON details',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            coordinates TEXT,
+            move_type TEXT DEFAULT 'play',
+            details TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )",
@@ -107,39 +190,28 @@ try {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             from_user_id INTEGER NOT NULL,
             to_user_id INTEGER NOT NULL,
-            status VARCHAR(50) DEFAULT 'pending' COMMENT 'pending, accepted, declined',
-            mode VARCHAR(50) DEFAULT 'free',
+            status TEXT DEFAULT 'pending',
+            mode TEXT DEFAULT 'free',
             time_limit INTEGER DEFAULT 15,
             increment INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (from_user_id) REFERENCES users(id),
             FOREIGN KEY (to_user_id) REFERENCES users(id)
         )",
         "CREATE TABLE IF NOT EXISTS password_resets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            token VARCHAR(255) UNIQUE,
-            expires_at TIMESTAMP NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            token TEXT UNIQUE,
+            expires_at DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )"
     ];
 
+    $commands = ($db_type === 'mysql') ? $mysqlCommands : $sqliteCommands;
+
     // Execute table creation
     foreach ($commands as $command) {
-        // Adjust for SQLite if needed
-        if ($db_type === 'sqlite') {
-            error_log("Original SQL: " . substr($command, 0, 80) . "...");
-            $command = str_replace('AUTO_INCREMENT', 'AUTOINCREMENT', $command);
-            $command = str_replace('LONGTEXT', 'TEXT', $command);
-            $command = str_replace("COMMENT 'JSON", "-- JSON", $command);
-            $command = preg_replace("/\s+COMMENT '[^']*'/", '', $command);
-            $command = preg_replace("/\s+ON UPDATE CURRENT_TIMESTAMP/", '', $command);
-            $command = preg_replace("/\s+CHARACTER SET .*/", '', $command);
-            $command = preg_replace("/\s+COLLATE .*/", '', $command);
-            error_log("Converted SQL: " . substr($command, 0, 80) . "...");
-        }
-        
         try {
             $pdo->exec($command);
         } catch (PDOException $e) {
@@ -192,19 +264,38 @@ try {
             $pdo->exec("ALTER TABLE moves ADD COLUMN details TEXT");
         }
     } else if ($db_type === 'mysql') {
-        // For MySQL, use ALTER TABLE ... ADD COLUMN IF NOT EXISTS
-        $checkColumns = function($table, $columns) use ($pdo) {
+        // For MySQL, use ALTER TABLE ... ADD COLUMN if missing
+        $checkColumns = function($table) use ($pdo) {
             $stmt = $pdo->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '$table' AND TABLE_SCHEMA = DATABASE()");
-            $existing = array_map(function($row) { return $row['COLUMN_NAME']; }, $stmt->fetchAll());
-            return $existing;
+            return array_map(function($row) { return $row['COLUMN_NAME']; }, $stmt->fetchAll());
         };
         
-        $gamesCols = $checkColumns('games', []);
-        if (!in_array('is_solo', $gamesCols)) {
-            $pdo->exec("ALTER TABLE games ADD COLUMN is_solo INTEGER DEFAULT 0");
+        $usersCols = $checkColumns('users');
+        if (!in_array('password_hash', $usersCols)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)");
+        }
+        if (!in_array('last_seen', $usersCols)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
         }
         
-        $movesCols = $checkColumns('moves', []);
+        $gamesCols = $checkColumns('games');
+        if (!in_array('updated_at', $gamesCols)) {
+            $pdo->exec("ALTER TABLE games ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+        }
+        if (!in_array('last_move_at', $gamesCols)) {
+            $pdo->exec("ALTER TABLE games ADD COLUMN last_move_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+        }
+        if (!in_array('consecutive_passes', $gamesCols)) {
+            $pdo->exec("ALTER TABLE games ADD COLUMN consecutive_passes INT DEFAULT 0");
+        }
+        if (!in_array('ended_at', $gamesCols)) {
+            $pdo->exec("ALTER TABLE games ADD COLUMN ended_at TIMESTAMP NULL");
+        }
+        if (!in_array('is_solo', $gamesCols)) {
+            $pdo->exec("ALTER TABLE games ADD COLUMN is_solo TINYINT DEFAULT 0");
+        }
+        
+        $movesCols = $checkColumns('moves');
         if (!in_array('move_type', $movesCols)) {
             $pdo->exec("ALTER TABLE moves ADD COLUMN move_type VARCHAR(50) DEFAULT 'play'");
         }
@@ -221,4 +312,3 @@ try {
     exit;
 }
 ?>
-

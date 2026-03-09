@@ -7,6 +7,12 @@ require_once '../db.php';
 header('Content-Type: application/json');
 
 $action = $_GET['action'] ?? '';
+try {
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+} catch (Exception $e) {
+    $driver = 'sqlite';
+}
+$isMySQL = ($driver === 'mysql');
 
 function authRateLimit() {
     $now = time();
@@ -112,7 +118,8 @@ if ($action === 'register') {
     }
 } elseif ($action === 'users') {
     $current_id = $_SESSION['user_id'] ?? 0;
-    $stmt = $pdo->prepare("SELECT id, username, last_seen FROM users WHERE id != ? AND last_seen >= datetime('now', '-10 minutes') ORDER BY last_seen DESC");
+    $recentExpr = $isMySQL ? "DATE_SUB(NOW(), INTERVAL 10 MINUTE)" : "datetime('now', '-10 minutes')";
+    $stmt = $pdo->prepare("SELECT id, username, last_seen FROM users WHERE id != ? AND last_seen >= $recentExpr ORDER BY last_seen DESC");
     $stmt->execute([$current_id]);
     $users = $stmt->fetchAll();
     echo json_encode(['users' => $users]);
@@ -177,7 +184,8 @@ if ($action === 'register') {
     $token = bin2hex(random_bytes(24));
     $stmt = $pdo->prepare("DELETE FROM password_resets WHERE user_id = ?");
     $stmt->execute([$user['id']]);
-    $stmt = $pdo->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, datetime('now', '+30 minutes'))");
+    $expiresExpr = $isMySQL ? "DATE_ADD(NOW(), INTERVAL 30 MINUTE)" : "datetime('now', '+30 minutes')";
+    $stmt = $pdo->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, $expiresExpr)");
     $stmt->execute([$user['id'], $token]);
 
     $isProd = getenv('APP_ENV') === 'prod';
@@ -194,7 +202,8 @@ if ($action === 'register') {
     if (strlen($newPass) < 8) {
         json_error('Mot de passe trop court (min 8)');
     }
-    $stmt = $pdo->prepare("SELECT pr.user_id FROM password_resets pr WHERE pr.token = ? AND pr.expires_at > datetime('now')");
+    $nowExpr = $isMySQL ? "NOW()" : "datetime('now')";
+    $stmt = $pdo->prepare("SELECT pr.user_id FROM password_resets pr WHERE pr.token = ? AND pr.expires_at > $nowExpr");
     $stmt->execute([$token]);
     $row = $stmt->fetch();
     if (!$row) {

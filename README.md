@@ -180,17 +180,10 @@ Voir `backend/logs/` pour les erreurs serveur.
 - ✅ BUG #4: Jokers mal gérés en échange (fixed)
 - ✅ BUG #5: Timer désynchronisé (ajout server_timestamp)
 
-## Support
-
-Pour signaler un bug ou proposer une fonctionnalité:
-- GitHub Issues: [lien repo]
-- Email: [contact]
-
 ## Licence
 
 MIT License - Voir `LICENSE` pour détails
 
 ---
 
-Développé par [Votre nom/équipe] 🎮
-"?? Scrabble en ligne!" 
+Développé par Emeralddossou
