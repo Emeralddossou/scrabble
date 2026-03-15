@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // backend/api/auth.php
 
 require_once '../bootstrap.php';
@@ -188,7 +188,9 @@ if ($action === 'register') {
     $stmt = $pdo->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, $expiresExpr)");
     $stmt->execute([$user['id'], $token]);
 
-    $isProd = getenv('APP_ENV') === 'prod';
+    $isProd = function_exists('is_production')
+        ? is_production()
+        : (strtolower((string)getEnv('APP_ENV', 'development')) === 'production');
     if ($isProd) {
         echo json_encode(['success' => true]);
     } else {
@@ -261,3 +263,4 @@ if ($action === 'register') {
     echo json_encode(['success' => true, 'user' => $user, 'stats' => $stats]);
 }
 ?>
+

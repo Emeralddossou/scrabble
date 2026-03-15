@@ -1,6 +1,8 @@
 // js/app.js
 
 const API_BASE = 'backend/api';
+const APP_DEBUG = window.APP_DEBUG === true || window.APP_DEBUG === 'true';
+const APP_ENV = window.APP_ENV || 'development';
 let csrfToken = sessionStorage.getItem('csrf_token') || '';
 
 function setCsrf(token) {
@@ -20,7 +22,24 @@ async function ensureCsrf(force = false) {
     if (res && res.csrf) setCsrf(res.csrf);
 }
 
-async function api(endpoint, method = 'GET', body = null) {
+function logApiError(endpoint, status, data, rawText) {
+    const requestId = data && data.request_id ? data.request_id : null;
+    const details = data && data.debug ? data.debug : null;
+    if (details || APP_DEBUG) {
+        console.groupCollapsed(`API ${endpoint} (${status})`);
+        console.error(data?.error || 'Erreur API');
+        if (requestId) console.info('Request ID:', requestId);
+        if (details) console.info('Debug:', details);
+        if (rawText && !details) console.info('Raw:', rawText);
+        console.groupEnd();
+    } else {
+        console.error(`API ${endpoint} (${status}):`, data?.error || 'Erreur API');
+        if (requestId) console.info('Request ID:', requestId);
+    }
+}
+
+async function api(endpoint, method = 'GET', body = null, options = {}) {
+    const retryOnCsrf = options.retryOnCsrf !== false;
     const headers = {
         'Content-Type': 'application/json'
     };
@@ -37,19 +56,36 @@ async function api(endpoint, method = 'GET', body = null) {
     try {
         const res = await fetch(`${API_BASE}/${endpoint}`, options);
         const text = await res.text();
+        let data = null;
         try {
-            const data = JSON.parse(text);
-            if (data && data.error && /csrf/i.test(data.error)) {
-                clearCsrf();
-            }
-            return data;
+            data = text ? JSON.parse(text) : {};
         } catch (e) {
-            console.error("API invalid JSON:", text);
-            throw e;
+            console.error('API invalid JSON:', text);
+            return { error: 'Réponse serveur invalide', status: res.status };
         }
+
+        if (data && data.error && /csrf/i.test(data.error)) {
+            clearCsrf();
+        }
+
+        if (data && data.error && /csrf/i.test(data.error) && method !== 'GET' && retryOnCsrf && !endpoint.includes('action=csrf')) {
+            await ensureCsrf(true);
+            return api(endpoint, method, body, { retryOnCsrf: false });
+        }
+
+        if (!res.ok) {
+            if (!data || typeof data !== 'object') data = {};
+            if (!data.error) data.error = `Erreur serveur (${res.status})`;
+            data.status = res.status;
+            logApiError(endpoint, res.status, data, text);
+        } else if (data && data.debug) {
+            logApiError(endpoint, res.status, data, text);
+        }
+
+        return data;
     } catch (e) {
         console.error('API Error:', e);
-        return { error: 'Connection failure' };
+        return { error: 'Connexion impossible', status: 0 };
     }
 }
 
@@ -297,7 +333,9 @@ async function fetchDashboardData() {
     const gamesList = document.getElementById('games-list');
     gamesList.innerHTML = '';
 
-    if (gamesRes.games && gamesRes.games.length > 0) {
+    if (gamesRes.error) {
+        gamesList.innerHTML = `<p class="muted">${gamesRes.error}</p>`;
+    } else if (gamesRes.games && gamesRes.games.length > 0) {
         gamesRes.games.forEach(g => {
             const div = document.createElement('div');
             div.className = 'game-item';
@@ -307,7 +345,7 @@ async function fetchDashboardData() {
             div.innerHTML = `
                 <div>
                     <strong>vs ${opponent}</strong>
-                    <br><span style="font-size: 0.8em; opacity: 0.7;">${g.status} | ${isFinished ? 'Terminé' : (g.current_player_id == currentUser.id ? 'A vous' : 'Adverse')}</span>
+                    <br><span style="font-size: 0.8em; opacity: 0.7;">${g.status} | ${isFinished ? 'Terminé' : (g.current_player_id == currentUser.id ? 'À vous' : 'Adversaire')}</span>
                 </div>
                 <div style="display:flex; gap:6px;">
                     ${isFinished ? `<button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="window.location.href='replay.php?id=${g.id}'">Replay</button>` : `<button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="window.location.href='game.php?id=${g.id}'">Jouer</button>`}
@@ -323,7 +361,9 @@ async function fetchDashboardData() {
     const usersList = document.getElementById('users-list');
     usersList.innerHTML = '';
 
-    if (usersRes.users && usersRes.users.length > 0) {
+    if (usersRes.error) {
+        usersList.innerHTML = `<p class="muted">${usersRes.error}</p>`;
+    } else if (usersRes.users && usersRes.users.length > 0) {
         usersRes.users.forEach(u => {
             const div = document.createElement('div');
             div.style.cssText = 'padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;';
@@ -352,7 +392,9 @@ async function fetchInvites() {
     const res = await api('game.php?action=invites');
     invitesList.innerHTML = '';
 
-    if (res.invites && res.invites.length > 0) {
+    if (res.error) {
+        invitesList.innerHTML = `<p class="muted">${res.error}</p>`;
+    } else if (res.invites && res.invites.length > 0) {
         res.invites.forEach(inv => {
             const div = document.createElement('div');
             div.style.cssText = 'padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; gap: 8px;';
@@ -395,7 +437,9 @@ async function fetchStats() {
     const statsEl = document.getElementById('stats');
     if (!statsEl) return;
     const res = await api('auth.php?action=stats');
-    if (res.success) {
+    if (res.error) {
+        statsEl.innerHTML = `<p class="muted">${res.error}</p>`;
+    } else if (res.success) {
         const s = res.stats || {};
         statsEl.innerHTML = `
             <div>Parties: <strong>${s.total || 0}</strong></div>
@@ -410,7 +454,9 @@ async function fetchLeaderboard() {
     const boardEl = document.getElementById('leaderboard');
     if (!boardEl) return;
     const res = await api('auth.php?action=leaderboard');
-    if (res.success) {
+    if (res.error) {
+        boardEl.innerHTML = `<p class="muted">${res.error}</p>`;
+    } else if (res.success) {
         const leaders = res.leaders || [];
         if (leaders.length === 0) {
             boardEl.innerHTML = '<p>Aucun classement.</p>';

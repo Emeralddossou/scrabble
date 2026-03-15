@@ -1,6 +1,8 @@
 <?php
 // backend/bootstrap.php
 
+require_once __DIR__ . '/env.php';
+
 // Setup error logging first
 error_reporting(E_ALL);
 @mkdir(__DIR__ . DIRECTORY_SEPARATOR . 'logs', 0777, true);
@@ -10,9 +12,32 @@ ini_set('error_log', __DIR__ . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATO
 
 error_log("=== Bootstrap started ===");
 
+function app_env() {
+    return strtolower((string)getEnv('APP_ENV', 'development'));
+}
+
+function is_production() {
+    $env = app_env();
+    return in_array($env, ['production', 'prod', 'live'], true);
+}
+
+function is_debug() {
+    $flag = strtolower((string)getEnv('APP_DEBUG', 'false'));
+    return in_array($flag, ['1', 'true', 'yes', 'on'], true);
+}
+
+function request_id() {
+    static $rid = null;
+    if ($rid !== null) {
+        return $rid;
+    }
+    $rid = $_SERVER['HTTP_X_REQUEST_ID'] ?? bin2hex(random_bytes(6));
+    return $rid;
+}
+
 $isSecure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 
-if (getenv('APP_ENV') === 'prod' && !$isSecure) {
+if (is_production() && !$isSecure) {
     header('Content-Type: application/json');
     http_response_code(403);
     echo json_encode(['error' => 'HTTPS requis en production']);
@@ -27,22 +52,86 @@ session_set_cookie_params([
 ini_set('session.gc_maxlifetime', '604800'); // 7 days
 
 session_start();
+request_id();
+
+function send_json($payload, $httpCode = 200) {
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+        http_response_code($httpCode);
+    }
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+}
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    $context = [
+        'errno' => $errno,
+        'message' => $errstr,
+        'file' => $errfile,
+        'line' => $errline,
+        'request_id' => request_id()
+    ];
     error_log("[$errno] $errstr in $errfile:$errline");
-    header('Content-Type: application/json');
-    http_response_code(500);
-    echo json_encode(['error' => 'Erreur serveur']);
-    exit;
+    $debug = is_debug() ? $context : null;
+    json_error('Erreur serveur', 500, $context, $debug);
+    return true;
 });
 
-function json_error($message, $httpCode = 400, $context = null) {
+set_exception_handler(function($e) {
+    $context = [
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'code' => $e->getCode(),
+        'request_id' => request_id()
+    ];
+    $debug = null;
+    if (is_debug()) {
+        $debug = $context;
+        $debug['trace'] = explode("\n", $e->getTraceAsString());
+    }
+    json_error('Erreur serveur', 500, $context, $debug);
+});
+
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if (!$error) return;
+    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR];
+    if (!in_array($error['type'], $fatalTypes, true)) return;
+
+    $context = [
+        'type' => $error['type'],
+        'message' => $error['message'] ?? '',
+        'file' => $error['file'] ?? '',
+        'line' => $error['line'] ?? 0,
+        'request_id' => request_id()
+    ];
+    error_log("[FATAL] {$context['message']} in {$context['file']}:{$context['line']}");
+
+    $payload = [
+        'error' => 'Erreur serveur',
+        'request_id' => request_id()
+    ];
+    if (is_debug()) {
+        $payload['debug'] = $context;
+    }
+    send_json($payload, 500);
+});
+
+function json_error($message, $httpCode = 400, $context = null, $debug = null) {
     if ($context) {
         error_log($message . ' | ' . json_encode($context));
     }
-    header('Content-Type: application/json');
-    http_response_code($httpCode);
-    echo json_encode(['error' => $message]);
+    if (is_debug() && $debug === null && $context !== null) {
+        $debug = $context;
+    }
+    $payload = [
+        'error' => $message,
+        'request_id' => request_id()
+    ];
+    if (is_debug() && $debug) {
+        $payload['debug'] = $debug;
+    }
+    send_json($payload, $httpCode);
     exit;
 }
 

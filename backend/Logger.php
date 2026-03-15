@@ -1,6 +1,8 @@
 <?php
 // backend/Logger.php - Structured Logging
 
+require_once __DIR__ . '/env.php';
+
 class Logger {
     private $logDir;
     private static $instance = null;

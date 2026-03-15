@@ -1,9 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scrabble Français - Connexion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="page-auth">
@@ -50,6 +53,16 @@
             </form>
         </div>
     </div>
+    <?php
+        require_once __DIR__ . '/backend/env.php';
+        $appEnv = getEnv('APP_ENV', 'development');
+        $appDebug = strtolower((string)getEnv('APP_DEBUG', 'false'));
+        $appDebug = in_array($appDebug, ['1', 'true', 'yes', 'on'], true);
+    ?>
+    <script>
+        window.APP_ENV = <?php echo json_encode($appEnv); ?>;
+        window.APP_DEBUG = <?php echo $appDebug ? 'true' : 'false'; ?>;
+    </script>
     <script src="js/app.js"></script>
 </body>
 </html>

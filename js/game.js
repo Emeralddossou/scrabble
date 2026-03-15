@@ -1,186 +1,6 @@
-// js/game.js
+﻿// js/game.js
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-**Phase 7 Status:** ✅ Complétée---- [ ] API response compression (futur)- [ ] Database indexing optimization (futur)- [ ] Redis caching (futur)- [x] Détection des requêtes lentes- [x] Cache dictionnaire statique- [x] Auto-save des placements- [x] Métriques de latence API- [x] Logs structurés en JSON## Checkliste de Performance   - Caching long-terme   - Servir assets statiques via CDN5. **CDN**   - Minification CSS/JS   - Gzip des réponses API4. **Compression**   - Index sur timestamps   - Index sur (game_id, user_id)3. **Database Indexes**   - Alertes Slack/email sur erreurs   - Dashboard Grafana/Prometheus2. **Monitoring en temps réel**   - Sessions distribuées   - Dictionary en Redis au lieu de fichier1. **Cache Redis**## Points d'Amélioration Futurs```API errors → Contexte complet (endpoint, user_id, etc)Toutes erreurs PHP → Error log + stack trace```### Error Tracking```Duration > 1000ms → Warning log + contexte```### Slow Requests## Monitoring & Alerting```}    }        // Traiter erreurs    if ($entry['level'] === 'ERROR') {    $entry = json_decode($line, true);foreach ($lines as $line) {$lines = file($logFile, FILE_SKIP_EMPTY_LINES);$logFile = 'backend/logs/2026-03-04.log';// PHP```php### Parser JSON des logs```grep '"endpoint":"game.php' backend/logs/*.log | wc -l# Compte des appels par endpointgrep '"duration_ms":[0-9]{4,}' backend/logs/$(date +%Y-%m-%d).log# Afficher les requêtes lentesgrep '"level":"ERROR"' backend/logs/$(date +%Y-%m-%d).log# Afficher les erreurs du jour```bash### Lecture des logs```└── ...├── 2026-03-05.log├── 2026-03-04.logbackend/logs/```### Localisation## Répertoire des Logs```// { apiCalls: 5, apiErrors: 0, avgLatency: 120.5, ... }console.log(performanceMetrics);```javascript**Accès:**- Latence moyenne- Nombre d'erreurs- Nombre d'appels API**Tracking:**### 5. Métriques API côté Frontend```}, 3000);    await apiWithMetrics('game.php?action=save_placements', ...);    if (!isMyTurn || temporaryPlacements.length === 0) return;savePlacementsTimer = setInterval(async () => {// Auto-save every 3 seconds```javascript**Code:**- Améliore la persistance contre les crashes- Appel API silencieux (ne bloque pas l'UI)- Sauvegarde automatique toutes les 3 secondes si changement**Fonctionnement:**### 4. Auto-Save des Placements```return isset($dictionary[$upperWord]);}    return isset($dictionary[$testWord]);    $testWord = preg_replace('/[a-z]/', 'A', $upperWord);if (preg_match('/[a-z]/', $word)) {// Teste aussi les jokers```php**Nouveau code:**```$dictionary[strtoupper($word)];```php**Ancien code:**- Support des mots avec jokers- Gestion améliorée des jokers (blanks)- Cache statique en mémoire PHP**Amélioration:**### 3. Optimisation du Dictionnaire- Console logs pour débogage (après 5 secondes)- Latence moyenne calculée- Décompte des appels API- Métriques de performance en mémoire (`performanceMetrics`)**Frontend:**- Logging complet de chaque API call- Alertes sur les requêtes lentes (> 1 second)- Mesure de la durée des requêtes API**Backend:**### 2. Performance Tracking```}  "user_id": 5  "ip": "192.168.1.1",  },    "duration_ms": 145    "status": 200,    "endpoint": "game.php?action=play_turn",    "method": "POST",  "context": {  "message": "API Request: POST game.php?action=play_turn",  "request_id": "abc123def",  "level": "API",  "timestamp": "2026-03-04 14:23:15",{```json**Exemple:**- **Niveaux**: info, warning, error, debug (si APP_DEBUG=true)- **Fichiers**: Journaux quotidiens (`YYYY-MM-DD.log`)- **Contenu**: timestamp, level, request_id, user_id, IP, contexte- **Format JSON**: Chaque log est en JSON pour parsing facile**Classe:** `Logger` (backend/Logger.php)### 1. Logging Structuré (Logger.php)## Améliorations Implémentéesconst urlParams = new URLSearchParams(window.location.search);
+const urlParams = new URLSearchParams(window.location.search);
 const gameId = urlParams.get('id');
 
 let gameState = null;
@@ -385,6 +205,7 @@ function playSound(type) {
     if (type === 'error') { freq = 180; duration = 0.16; }
     if (type === 'resign') { freq = 260; duration = 0.2; }
     if (type === 'toggle') { freq = 420; duration = 0.06; }
+    if (type === 'place') { freq = 480; duration = 0.05; }
 
     o.type = 'sine';
     o.frequency.setValueAtTime(freq, now);
@@ -403,18 +224,18 @@ let savePlacementsTimer = null;
 async function apiWithMetrics(endpoint, method = 'GET', body = null) {
     const startTime = performance.now();
     performanceMetrics.apiCalls++;
-    
+
     try {
         const res = await api(endpoint, method, body);
         const latency = performance.now() - startTime;
-        
+
         // Update running average
         performanceMetrics.avgLatency = (performanceMetrics.avgLatency + latency) / 2;
-        
+
         if (typeof console !== 'undefined' && performance.now() > 5000) {
             console.debug(`API ${endpoint}: ${latency.toFixed(0)}ms`);
         }
-        
+
         return res;
     } catch (err) {
         performanceMetrics.apiErrors++;
@@ -424,12 +245,12 @@ async function apiWithMetrics(endpoint, method = 'GET', body = null) {
 }
 
 function startSavingPlacements() {
-    if (savePlacementsTimer) return;
-    
-    // Auto-save placements every 3 seconds
+    if (savePlacementsTimer) clearInterval(savePlacementsTimer);
+
+    // Auto-save placements every 2.5 seconds
     savePlacementsTimer = setInterval(async () => {
         if (!isMyTurn || temporaryPlacements.length === 0) return;
-        
+
         try {
             await apiWithMetrics('game.php?action=save_placements', 'POST', {
                 game_id: gameId,
@@ -438,8 +259,9 @@ function startSavingPlacements() {
         } catch (err) {
             // Silent fail, will retry next interval
         }
-    }, 3000);
+    }, 2500);
 }
+
 let serverTime = null;
 
 function startPolling() {
@@ -449,19 +271,6 @@ function startPolling() {
         await fetchGameState();
         startPolling();
     }, interval);
-}
-
-// BUG #1 Fix: Periodically save placements to server
-function startSavingPlacements() {
-    if (savePlacementsTimer) clearTimeout(savePlacementsTimer);
-    savePlacementsTimer = setInterval(async () => {
-        if (temporaryPlacements.length > 0 && isMyTurn) {
-            await api('game.php?action=save_placements', 'POST', {
-                game_id: gameId,
-                placements: temporaryPlacements
-            });
-        }
-    }, 2000); // Save every 2 seconds if there are placements
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -503,60 +312,71 @@ function getCellClass(r, c) {
 
 async function fetchGameState() {
     const res = await api(`game.php?action=state&id=${gameId}`);
-    if (res.error) {
-        uiAlert(res.error);
+    if (!res || res.error) {
+        uiAlert(res?.error || 'Erreur serveur');
         return;
     }
 
     gameState = res.game;
     const me = res.me;
+    const players = Array.isArray(res.players) ? res.players : [];
 
-    // BUG #5 Fix: Store server timestamp for timer calculation
+    // Store server timestamp for timer calculation
     serverTime = res.server_timestamp || Math.floor(Date.now() / 1000);
 
-    // BUG #1 Fix: Restore saved placements when fetching game state
+    // Restore saved placements when fetching game state
     if (me == res.game.current_player_id && temporaryPlacements.length === 0) {
         const savedRes = await api(`game.php?action=load_placements&game_id=${gameId}`);
-        if (savedRes.placements && savedRes.placements.length > 0) {
+        if (savedRes?.placements && savedRes.placements.length > 0) {
             temporaryPlacements = savedRes.placements;
         }
     }
 
-    const p1 = res.players[0];
-    const p2 = res.players[1];
+    const p1 = players[0] || {};
+    const p2 = players[1] || null;
 
     const p1NameEl = document.getElementById('player1-name');
     const p2NameEl = document.getElementById('player2-name');
-    p1NameEl.textContent = p1.username;
-    p1NameEl.dataset.userId = p1.user_id;
-    document.getElementById('player1-score').textContent = p1.score;
+    if (p1NameEl) {
+        p1NameEl.textContent = p1.username || 'J1';
+        p1NameEl.dataset.userId = p1.user_id || '';
+    }
+    const p1ScoreEl = document.getElementById('player1-score');
+    if (p1ScoreEl) p1ScoreEl.textContent = p1.score ?? 0;
+
     if (gameState.mode === 'timer') {
         document.getElementById('p1-timer').textContent = formatTime(p1.time_remaining ?? 0);
     } else {
-        document.getElementById('p1-timer').textContent = "";
+        document.getElementById('p1-timer').textContent = '';
     }
 
-    // Phase 2: Handle solo mode
+    // Solo mode
     if (gameState.is_solo) {
-        p2NameEl.textContent = 'Mode Solo';
-        p2NameEl.style.fontStyle = 'italic';
-        p2NameEl.style.color = '#999';
+        if (p2NameEl) {
+            p2NameEl.textContent = 'Mode Solo';
+            p2NameEl.style.fontStyle = 'italic';
+            p2NameEl.style.color = '#999';
+        }
         document.getElementById('player2-score').textContent = '—';
         document.getElementById('p2-timer').textContent = '';
     } else if (p2) {
-        p2NameEl.textContent = p2.username;
-        p2NameEl.dataset.userId = p2.user_id;
-        document.getElementById('player2-score').textContent = p2.score;
+        if (p2NameEl) {
+            p2NameEl.textContent = p2.username || 'J2';
+            p2NameEl.dataset.userId = p2.user_id || '';
+            p2NameEl.style.fontStyle = '';
+            p2NameEl.style.color = '';
+        }
+        document.getElementById('player2-score').textContent = p2.score ?? 0;
         if (gameState.mode === 'timer') {
             document.getElementById('p2-timer').textContent = formatTime(p2.time_remaining ?? 0);
         } else {
-            document.getElementById('p2-timer').textContent = "";
+            document.getElementById('p2-timer').textContent = '';
         }
     }
 
     isMyTurn = gameState.current_player_id == me;
     if (gameState.status === 'finished') {
-        const winner = res.players.find(p => p.user_id == gameState.winner_id);
+        const winner = players.find(p => p.user_id == gameState.winner_id);
         document.getElementById('game-status').textContent = winner ? `Terminé - Victoire de ${winner.username}` : 'Terminé - Match nul';
         document.getElementById('game-status').style.color = '#fbbf24';
         const badge = document.getElementById('turn-badge');
@@ -564,7 +384,7 @@ async function fetchGameState() {
         disableActions();
         if (exchangeMode) cancelExchangeMode();
     } else {
-        document.getElementById('game-status').textContent = isMyTurn ? "C'est à votre tour !" : "Adverse...";
+        document.getElementById('game-status').textContent = isMyTurn ? "C'est à votre tour !" : 'Adversaire...';
         document.getElementById('game-status').style.color = isMyTurn ? '#4ade80' : '#f87171';
         const badge = document.getElementById('turn-badge');
         if (badge) badge.style.display = isMyTurn ? 'none' : 'inline-flex';
@@ -591,25 +411,24 @@ async function fetchGameState() {
     if (res.moves) renderHistory(res.moves);
 
     updatePreviewScore();
-    
-    // Start saving placements if not already saving and it's our turn
+
     if (isMyTurn && !savePlacementsTimer) {
         startSavingPlacements();
     }
 }
 
 function disableActions() {
-    ['btn-submit','btn-recall','btn-shuffle','btn-exchange','btn-cancel-exchange','btn-pass','btn-resign'].forEach(id => {
+    ['btn-submit', 'btn-recall', 'btn-shuffle', 'btn-exchange', 'btn-cancel-exchange', 'btn-pass', 'btn-resign'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = true;
     });
 }
 
-function setActionState(isMyTurn) {
-    const disabledIds = ['btn-submit','btn-exchange','btn-cancel-exchange','btn-pass','btn-resign'];
+function setActionState(turn) {
+    const disabledIds = ['btn-submit', 'btn-exchange', 'btn-cancel-exchange', 'btn-pass', 'btn-resign'];
     disabledIds.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.disabled = !isMyTurn;
+        if (el) el.disabled = !turn;
     });
 }
 
@@ -617,6 +436,7 @@ function updateBoardUI(serverBoard) {
     for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 15; c++) {
             const cell = document.querySelector(`.cell[data-r='${r}'][data-c='${c}']`);
+            if (!cell) continue;
             const isTemp = temporaryPlacements.some(t => t.r === r && t.c === c);
             if (!isTemp) {
                 cell.innerHTML = '';
@@ -786,8 +606,8 @@ function placeTileOnCell(cell, tileEl) {
     if (!cell || !tileEl) return;
     if (cell.children.length > 0) return;
 
-    const r = parseInt(cell.dataset.r);
-    const c = parseInt(cell.dataset.c);
+    const r = parseInt(cell.dataset.r, 10);
+    const c = parseInt(cell.dataset.c, 10);
     const letter = tileEl.dataset.letter;
     const rackLetter = tileEl.dataset.rackLetter || letter;
     const isBlank = tileEl.dataset.isBlank === '1';
@@ -810,6 +630,7 @@ function returnTileToRack(r, c) {
     updatePreviewScore();
 
     const cell = document.querySelector(`.cell[data-r='${r}'][data-c='${c}']`);
+    if (!cell) return;
     cell.innerHTML = '';
     const type = getCellClass(r, c);
     if (type === 'tw') cell.textContent = 'MT';
@@ -821,16 +642,16 @@ function returnTileToRack(r, c) {
 function recallTiles() {
     temporaryPlacements = [];
     const cells = document.querySelectorAll('.cell');
-    cells.forEach(c => {
-        if (c.querySelector('.tile:not(.locked)')) {
-            c.innerHTML = '';
-            const r = c.dataset.r;
-            const cIdx = c.dataset.c;
-            const type = getCellClass(r, cIdx);
-            if (type === 'tw') c.textContent = 'MT';
-            else if (type === 'dw') c.textContent = 'MD';
-            else if (type === 'tl') c.textContent = 'LT';
-            else if (type === 'dl') c.textContent = 'LD';
+    cells.forEach(cell => {
+        if (cell.querySelector('.tile:not(.locked)')) {
+            const r = parseInt(cell.dataset.r, 10);
+            const c = parseInt(cell.dataset.c, 10);
+            cell.innerHTML = '';
+            const type = getCellClass(r, c);
+            if (type === 'tw') cell.textContent = 'MT';
+            else if (type === 'dw') cell.textContent = 'MD';
+            else if (type === 'tl') cell.textContent = 'LT';
+            else if (type === 'dl') cell.textContent = 'LD';
         }
     });
     clearSelectedTile();
@@ -852,7 +673,7 @@ async function submitMove() {
     };
 
     const res = await api('game.php?action=play_turn', 'POST', payload);
-    if (res.success) {
+    if (res && res.success) {
         temporaryPlacements = [];
         clearSelectedTile();
         playSound('submit');
@@ -860,7 +681,7 @@ async function submitMove() {
         fetchGameState();
     } else {
         playSound('error');
-        uiAlert('Erreur: ' + res.error);
+        uiAlert('Erreur: ' + (res?.error || 'Impossible de valider le coup'));
     }
 }
 
@@ -873,9 +694,9 @@ function shuffleRack() {
 
 async function passTurn() {
     if (exchangeMode) return;
-    if (await uiConfirm("Passer votre tour ?")) {
+    if (await uiConfirm('Passer votre tour ?')) {
         const res = await api('game.php?action=pass', 'POST', { game_id: gameId });
-        if (res.success) {
+        if (res && res.success) {
             playSound('pass');
             uiToast('Tour passé', 'info', 1200);
         }
@@ -885,12 +706,12 @@ async function passTurn() {
 }
 
 async function resignGame() {
-    if (await uiConfirm("Abandonner la partie ?")) {
+    if (await uiConfirm('Abandonner la partie ?')) {
         const res = await api('game.php?action=resign', 'POST', { game_id: gameId });
-        if (res.success) {
+        if (res && res.success) {
             playSound('resign');
             uiToast('Partie abandonnée', 'info', 1200);
-        } else if (res.error) {
+        } else if (res && res.error) {
             playSound('error');
             uiAlert(res.error);
         }
@@ -948,14 +769,14 @@ async function confirmExchange() {
     }
     const letters = Array.from(exchangeSelections).map(tile => tile.dataset.rackLetter || tile.dataset.letter);
     const res = await api('game.php?action=exchange', 'POST', { game_id: gameId, letters });
-    if (res.success) {
+    if (res && res.success) {
         playSound('exchange');
         uiToast('Échange effectué', 'success', 1200);
         cancelExchangeMode();
         fetchGameState();
     } else {
         playSound('error');
-        uiAlert(res.error || 'Échange impossible');
+        uiAlert(res?.error || 'Échange impossible');
     }
 }
 
@@ -969,9 +790,9 @@ function getPoints(letter) {
 }
 
 function formatTime(seconds) {
-    if (seconds < 0) return "(0:00)";
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const total = Math.max(0, parseInt(seconds ?? 0, 10));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
     return `(${m}:${s.toString().padStart(2, '0')})`;
 }
 
@@ -989,13 +810,20 @@ function renderHistory(moves) {
         } else if (m.move_type === 'pass') {
             text = `${name} passe.`;
         } else if (m.move_type === 'exchange') {
-            const details = m.details ? JSON.parse(m.details) : {};
+            let details = {};
+            if (m.details) {
+                try {
+                    details = JSON.parse(m.details);
+                } catch (err) {
+                    details = {};
+                }
+            }
             const count = details.count || 0;
             text = `${name} échange ${count} lettre(s).`;
         } else if (m.move_type === 'resign') {
             text = `${name} abandonne.`;
         } else if (m.move_type === 'end') {
-            text = `Fin de partie.`;
+            text = 'Fin de partie.';
         } else {
             text = m.word || '';
         }

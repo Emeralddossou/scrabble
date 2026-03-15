@@ -6,6 +6,17 @@ require_once __DIR__ . '/env.php';
 // Get database configuration from .env
 $db_type = strtolower(getEnv('DB_TYPE', 'mysql'));
 $pdo = null;
+$allowFallback = true;
+if (function_exists('is_production')) {
+    $allowFallback = !is_production();
+} else {
+    $env = strtolower((string)getEnv('APP_ENV', 'development'));
+    $allowFallback = !in_array($env, ['production', 'prod', 'live'], true);
+}
+$fallbackFlag = strtolower((string)getEnv('DB_ALLOW_FALLBACK', 'true'));
+if (in_array($fallbackFlag, ['0', 'false', 'no'], true)) {
+    $allowFallback = false;
+}
 
 try {
     if ($db_type === 'mysql') {
@@ -28,8 +39,12 @@ try {
             $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             $pdo->exec("USE `$db_name`");
         } catch (Exception $e) {
-            error_log("MySQL connection failed, falling back to SQLite: " . $e->getMessage());
-            $db_type = 'sqlite';
+            if ($allowFallback) {
+                error_log("MySQL connection failed, falling back to SQLite: " . $e->getMessage());
+                $db_type = 'sqlite';
+            } else {
+                throw $e;
+            }
         }
     }
 
@@ -306,9 +321,17 @@ try {
 
 } catch (PDOException $e) {
     error_log("Database connection error: " . $e->getMessage());
-    header('Content-Type: application/json');
-    http_response_code(500);
-    echo json_encode(['error' => 'Erreur serveur: ' . $e->getMessage()]);
-    exit;
+    $debug = [
+        'db_error' => $e->getMessage(),
+        'code' => $e->getCode()
+    ];
+    if (function_exists('json_error')) {
+        json_error('Erreur serveur', 500, $debug, $debug);
+    } else {
+        header('Content-Type: application/json');
+        http_response_code(500);
+        echo json_encode(['error' => 'Erreur serveur']);
+        exit;
+    }
 }
 ?>

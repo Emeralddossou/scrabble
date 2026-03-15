@@ -1,9 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scrabble Français - Replay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="page-replay">
@@ -17,10 +20,8 @@
         </div>
 
         <div class="replay-layout">
-            <div id="board" class="replay-board" style="pointer-events: none;">
-                <!-- Grid -->
-            </div>
-            
+            <div id="board" class="replay-board" style="pointer-events: none;"></div>
+
             <div class="glass-card replay-controls">
                 <h3>Contrôles</h3>
                 <div class="replay-actions">
@@ -37,6 +38,16 @@
         </div>
     </div>
 
+    <?php
+        require_once __DIR__ . '/backend/env.php';
+        $appEnv = getEnv('APP_ENV', 'development');
+        $appDebug = strtolower((string)getEnv('APP_DEBUG', 'false'));
+        $appDebug = in_array($appDebug, ['1', 'true', 'yes', 'on'], true);
+    ?>
+    <script>
+        window.APP_ENV = <?php echo json_encode($appEnv); ?>;
+        window.APP_DEBUG = <?php echo $appDebug ? 'true' : 'false'; ?>;
+    </script>
     <script src="js/app.js"></script>
     <script>
         const gameId = new URLSearchParams(window.location.search).get('id');
@@ -44,7 +55,7 @@
         let currentStep = 0;
 
         document.getElementById('game-id-display').textContent = gameId;
-        initBoard(); 
+        initBoard();
         fetchReplayData();
 
         function initBoard() {
@@ -110,7 +121,7 @@
                 cell.innerHTML = '';
                 cell.appendChild(tile);
             });
-            
+
             document.getElementById('word-played').textContent = move.word;
             document.getElementById('points-scored').textContent = move.points;
 
@@ -119,13 +130,13 @@
         }
 
         function prevMove() {
-             if (currentStep <= 0) return;
-             currentStep--;
-             initBoard();
-             for(let i=0; i<currentStep; i++) {
-                 const move = moves[i];
-                 const coords = JSON.parse(move.coordinates);
-                 coords.forEach(m => {
+            if (currentStep <= 0) return;
+            currentStep--;
+            initBoard();
+            for (let i = 0; i < currentStep; i++) {
+                const move = moves[i];
+                const coords = JSON.parse(move.coordinates);
+                coords.forEach(m => {
                     const cell = document.querySelector(`.cell[data-r='${m.r}'][data-c='${m.c}']`);
                     const tile = document.createElement('div');
                     tile.className = 'tile locked';
@@ -134,9 +145,9 @@
                     tile.textContent = isBlank ? m.letter.toUpperCase() : m.letter;
                     cell.innerHTML = '';
                     cell.appendChild(tile);
-                 });
-             }
-             document.getElementById('current-move').textContent = currentStep;
+                });
+            }
+            document.getElementById('current-move').textContent = currentStep;
         }
 
         let autoInterval;

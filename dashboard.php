@@ -1,9 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scrabble Français - Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="page-dashboard">
@@ -22,37 +25,31 @@
         </header>
 
         <div class="dashboard-grid">
-            <!-- Active Games -->
             <div class="glass-card">
                 <h3>Mes Parties</h3>
                 <div id="games-list">Chargement...</div>
             </div>
 
-            <!-- Online Users / Invite -->
             <div class="glass-card">
                 <h3>Joueurs en ligne</h3>
                 <div id="users-list">Chargement...</div>
             </div>
 
-            <!-- Invitations -->
             <div class="glass-card">
                 <h3>Invitations</h3>
                 <div id="invites-list">Chargement...</div>
             </div>
 
-            <!-- Stats -->
             <div class="glass-card">
                 <h3>Stats</h3>
                 <div id="stats">Chargement...</div>
             </div>
 
-            <!-- Classement -->
             <div class="glass-card">
                 <h3>Classement</h3>
                 <div id="leaderboard">Chargement...</div>
             </div>
 
-            <!-- Change Password (hidden by default) -->
             <div class="glass-card is-hidden" id="password-card">
                 <h3>Changer le mot de passe</h3>
                 <form id="change-password-form">
@@ -64,8 +61,7 @@
             </div>
         </div>
     </div>
-    
-    <!-- Modal for new solo game -->
+
     <div id="solo-game-modal" class="glass-card modal" style="display:none;">
         <h3>Nouvelle partie solo</h3>
         <label>Mode de jeu:</label>
@@ -73,7 +69,7 @@
             <option value="free">Libre (Sans limite)</option>
             <option value="timer">Chronométré</option>
         </select>
-        
+
         <div id="solo-timer-settings" style="display:none;">
             <label>Temps par tour (min):</label>
             <input type="number" id="solo-time-limit" value="15" min="1">
@@ -87,7 +83,6 @@
         </div>
     </div>
 
-    <!-- Modal for new game -->
     <div id="invite-modal" class="glass-card modal" style="display:none;">
         <h3>Inviter <span id="invite-target-name"></span></h3>
         <label>Mode de jeu:</label>
@@ -95,7 +90,7 @@
             <option value="free">Libre (Sans limite)</option>
             <option value="timer">Chronométré</option>
         </select>
-        
+
         <div id="timer-settings" style="display:none;">
             <label>Temps par joueur (min):</label>
             <input type="number" id="time-limit" value="15" min="1">
@@ -109,7 +104,6 @@
         </div>
     </div>
 
-    <!-- Profile Modal -->
     <div id="profile-modal" class="glass-card modal" style="display:none;">
         <h3 id="profile-title">Profil</h3>
         <div id="profile-stats" class="profile-grid"></div>
@@ -119,6 +113,16 @@
         </div>
     </div>
 
+    <?php
+        require_once __DIR__ . '/backend/env.php';
+        $appEnv = getEnv('APP_ENV', 'development');
+        $appDebug = strtolower((string)getEnv('APP_DEBUG', 'false'));
+        $appDebug = in_array($appDebug, ['1', 'true', 'yes', 'on'], true);
+    ?>
+    <script>
+        window.APP_ENV = <?php echo json_encode($appEnv); ?>;
+        window.APP_DEBUG = <?php echo $appDebug ? 'true' : 'false'; ?>;
+    </script>
     <script src="js/app.js"></script>
     <script>
         checkAuth().then(() => {
@@ -126,17 +130,14 @@
             setInterval(fetchDashboardData, 5000);
         });
 
-        // Multiple game mode handlers
         document.getElementById('game-mode').addEventListener('change', (e) => {
             document.getElementById('timer-settings').style.display = e.target.value === 'timer' ? 'block' : 'none';
         });
-        
-        // Phase 2: Solo game mode
+
         document.getElementById('solo-game-mode').addEventListener('change', (e) => {
             document.getElementById('solo-timer-settings').style.display = e.target.value === 'timer' ? 'block' : 'none';
         });
 
-        // Solo button handler
         document.getElementById('btn-solo-game').addEventListener('click', openSoloModal);
     </script>
 </body>
