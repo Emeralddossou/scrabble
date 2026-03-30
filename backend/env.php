@@ -238,8 +238,9 @@ if (!function_exists('env_debug_info')) {
     }
 }
 
-if (!function_exists('getEnv')) {
-    function getEnv($key, $default = null) {
+if (!function_exists('env_get')) {
+    function env_get($key, $default = null) {
+        error_log("ENV STEP: env_get key=" . $key);
         static $env = null;
         static $reloaded = false;
         if ($env === null) {
@@ -284,3 +285,4 @@ if (!function_exists('getEnv')) {
     }
 }
 ?>
+

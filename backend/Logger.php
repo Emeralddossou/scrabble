@@ -59,7 +59,7 @@ class Logger {
     }
     
     public function debug($message, $context = []) {
-        if (getEnv('APP_DEBUG') === 'true') {
+        if (env_get('APP_DEBUG') === 'true') {
             $this->log('debug', $message, $context);
         }
     }
@@ -74,3 +74,4 @@ class Logger {
     }
 }
 ?>
+

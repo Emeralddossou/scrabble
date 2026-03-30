@@ -1,9 +1,9 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrabble FranÃ§ais - Dashboard</title>
+    <title>Scrabble Français - Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,13 +14,13 @@
         <header class="dashboard-header">
             <div>
                 <h2>Bienvenue, <span id="user-display">...</span></h2>
-                <p class="muted">PrÃªt pour une partie Ã©lÃ©gante et rapide ?</p>
+                <p class="muted">Prêt pour une partie élégante et rapide ?</p>
             </div>
             <div class="dashboard-actions">
                 <button id="btn-solo-game" class="btn-primary">Jouer Solo</button>
                 <button id="btn-my-profile" class="btn-ghost">Mon profil</button>
-                <button id="toggle-settings" class="btn-ghost">ParamÃ¨tres</button>
-                <button onclick="logout()" class="btn-danger">DÃ©connexion</button>
+                <button id="toggle-settings" class="btn-ghost">Paramètres</button>
+                <button onclick="logout()" class="btn-danger">Déconnexion</button>
             </div>
         </header>
 
@@ -56,7 +56,7 @@
                     <input type="password" id="current-password" placeholder="Mot de passe actuel" required minlength="8" autocomplete="current-password">
                     <input type="password" id="new-password" placeholder="Nouveau mot de passe" required minlength="8" autocomplete="new-password">
                     <input type="password" id="new-password-confirm" placeholder="Confirmer le nouveau mot de passe" required minlength="8" autocomplete="new-password">
-                    <button type="submit">Mettre Ã  jour</button>
+                    <button type="submit">Mettre à jour</button>
                 </form>
             </div>
         </div>
@@ -67,18 +67,18 @@
         <label>Mode de jeu:</label>
         <select id="solo-game-mode">
             <option value="free">Libre (Sans limite)</option>
-            <option value="timer">ChronomÃ©trÃ©</option>
+            <option value="timer">Chronométré</option>
         </select>
 
         <div id="solo-timer-settings" style="display:none;">
             <label>Temps par tour (min):</label>
             <input type="number" id="solo-time-limit" value="15" min="1">
-            <label>IncrÃ©ment (sec):</label>
+            <label>Incrément (sec):</label>
             <input type="number" id="solo-increment" value="0" min="0">
         </div>
 
         <div class="modal-actions">
-            <button onclick="createSoloGame()">DÃ©marrer</button>
+            <button onclick="createSoloGame()">Démarrer</button>
             <button onclick="closeSoloModal()" class="btn-muted">Annuler</button>
         </div>
     </div>
@@ -88,13 +88,13 @@
         <label>Mode de jeu:</label>
         <select id="game-mode">
             <option value="free">Libre (Sans limite)</option>
-            <option value="timer">ChronomÃ©trÃ©</option>
+            <option value="timer">Chronométré</option>
         </select>
 
         <div id="timer-settings" style="display:none;">
             <label>Temps par joueur (min):</label>
             <input type="number" id="time-limit" value="15" min="1">
-            <label>IncrÃ©ment (sec):</label>
+            <label>Incrément (sec):</label>
             <input type="number" id="increment" value="0" min="0">
         </div>
 
@@ -115,8 +115,8 @@
 
     <?php
         require_once __DIR__ . '/backend/env.php';
-        $appEnv = getEnv('APP_ENV', 'development');
-        $appDebug = strtolower((string)getEnv('APP_DEBUG', 'false'));
+        $appEnv = env_get('APP_ENV', 'development');
+        $appDebug = strtolower((string)env_get('APP_DEBUG', 'false'));
         $appDebug = in_array($appDebug, ['1', 'true', 'yes', 'on'], true);
     ?>
     <script>
@@ -142,3 +142,4 @@
     </script>
 </body>
 </html>
+

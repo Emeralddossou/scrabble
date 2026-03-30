@@ -1,4 +1,4 @@
-ï»¿<?php
+<?php
 // backend/api/auth.php
 
 require_once '../bootstrap.php';
@@ -24,7 +24,7 @@ function authRateLimit() {
     }
     $_SESSION['auth_rate']['count']++;
     if ($_SESSION['auth_rate']['count'] > 15) {
-        json_error('Trop de tentatives. RÃ©essayez plus tard.', 429);
+        json_error('Trop de tentatives. Réessayez plus tard.', 429);
     }
 }
 
@@ -49,7 +49,7 @@ if ($action === 'register') {
         json_error('Nom d\'utilisateur et mot de passe requis');
     }
     if (!validateUsername($username)) {
-        json_error('Nom d\'utilisateur invalide (3-20 caractÃ¨res, lettres/chiffres/._-)');
+        json_error('Nom d\'utilisateur invalide (3-20 caractères, lettres/chiffres/._-)');
     }
     if (strlen($password) < 8) {
         json_error('Mot de passe trop court (min 8)');
@@ -58,7 +58,7 @@ if ($action === 'register') {
     $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
     $stmt->execute([$username]);
     if ($stmt->fetch()) {
-        json_error('Nom d\'utilisateur dÃ©jÃ  pris');
+        json_error('Nom d\'utilisateur déjà pris');
     }
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -126,7 +126,7 @@ if ($action === 'register') {
 } elseif ($action === 'change_password') {
     require_csrf();
     if (!isset($_SESSION['user_id'])) {
-        json_error('Non connectÃ©', 401);
+        json_error('Non connecté', 401);
     }
     $data = json_decode(file_get_contents('php://input'), true);
     $current = $data['current_password'] ?? '';
@@ -150,7 +150,7 @@ if ($action === 'register') {
     echo json_encode(['success' => true]);
 } elseif ($action === 'stats') {
     if (!isset($_SESSION['user_id'])) {
-        json_error('Non connectÃ©', 401);
+        json_error('Non connecté', 401);
     }
     $uid = $_SESSION['user_id'];
     $stmt = $pdo->prepare("
@@ -190,7 +190,7 @@ if ($action === 'register') {
 
     $isProd = function_exists('is_production')
         ? is_production()
-        : (strtolower((string)getEnv('APP_ENV', 'development')) === 'production');
+        : (strtolower((string)env_get('APP_ENV', 'development')) === 'production');
     if ($isProd) {
         echo json_encode(['success' => true]);
     } else {
@@ -209,7 +209,7 @@ if ($action === 'register') {
     $stmt->execute([$token]);
     $row = $stmt->fetch();
     if (!$row) {
-        json_error('Token invalide ou expirÃ©', 400);
+        json_error('Token invalide ou expiré', 400);
     }
     $hash = password_hash($newPass, PASSWORD_DEFAULT);
     $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
@@ -231,7 +231,7 @@ if ($action === 'register') {
     echo json_encode(['success' => true, 'leaders' => $leaders]);
 } elseif ($action === 'profile') {
     if (!isset($_SESSION['user_id'])) {
-        json_error('Non connectÃ©', 401);
+        json_error('Non connecté', 401);
     }
     $target_id = intval($_GET['user_id'] ?? 0);
     if ($target_id <= 0) {
@@ -263,4 +263,5 @@ if ($action === 'register') {
     echo json_encode(['success' => true, 'user' => $user, 'stats' => $stats]);
 }
 ?>
+
 

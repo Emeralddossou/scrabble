@@ -13,7 +13,7 @@ ini_set('error_log', __DIR__ . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATO
 error_log("=== Bootstrap started ===");
 
 function app_env() {
-    return strtolower((string)getEnv('APP_ENV', 'development'));
+    return strtolower((string)env_get('APP_ENV', 'development'));
 }
 
 function is_production() {
@@ -22,7 +22,7 @@ function is_production() {
 }
 
 function is_debug() {
-    $flag = strtolower((string)getEnv('APP_DEBUG', 'false'));
+    $flag = strtolower((string)env_get('APP_DEBUG', 'false'));
     return in_array($flag, ['1', 'true', 'yes', 'on'], true);
 }
 
@@ -176,3 +176,4 @@ function maybe_cleanup($pdo) {
     }
 }
 ?>
+

@@ -9,7 +9,7 @@ if (defined('ENV_PHP_VERSION')) {
 error_log("ENV functions: loadEnv=" . (function_exists('loadEnv') ? '1' : '0') . " readEnvFile=" . (function_exists('readEnvFile') ? '1' : '0'));
 
 // Get database configuration from .env
-$rawDbType = (string)getEnv('DB_TYPE', 'mysql');
+$rawDbType = (string)env_get('DB_TYPE', 'mysql');
 error_log("DB_TYPE raw length=" . strlen($rawDbType));
 $db_type = strtolower(trim($rawDbType));
 $requestedDbType = $db_type;
@@ -26,10 +26,10 @@ $allowFallback = true;
 if (function_exists('is_production')) {
     $allowFallback = !is_production();
 } else {
-    $env = strtolower((string)getEnv('APP_ENV', 'development'));
+    $env = strtolower((string)env_get('APP_ENV', 'development'));
     $allowFallback = !in_array($env, ['production', 'prod', 'live'], true);
 }
-$fallbackFlag = strtolower((string)getEnv('DB_ALLOW_FALLBACK', 'true'));
+$fallbackFlag = strtolower((string)env_get('DB_ALLOW_FALLBACK', 'true'));
 if (in_array($fallbackFlag, ['0', 'false', 'no'], true)) {
     $allowFallback = false;
 }
@@ -38,11 +38,11 @@ try {
     if ($db_type === 'mysql') {
         try {
             // MySQL Connection
-            $db_host = getEnv('DB_HOST', 'localhost');
-            $db_port = getEnv('DB_PORT', '3306');
-            $db_user = getEnv('DB_USER', '');
-            $db_pass = getEnv('DB_PASS', '');
-            $db_name = getEnv('DB_NAME', 'scrabble');
+            $db_host = env_get('DB_HOST', 'localhost');
+            $db_port = env_get('DB_PORT', '3306');
+            $db_user = env_get('DB_USER', '');
+            $db_pass = env_get('DB_PASS', '');
+            $db_name = env_get('DB_NAME', 'scrabble');
             error_log("DB env lengths: host=" . strlen((string)$db_host) . " user=" . strlen((string)$db_user) . " name=" . strlen((string)$db_name));
             
             if (!$db_user) {
@@ -70,14 +70,14 @@ try {
     if ($db_type !== 'mysql') {
         // SQLite Connection (fallback or explicit)
         if ($requestedDbType === 'mysql') {
-            $host = getEnv('DB_HOST', '');
-            $name = getEnv('DB_NAME', '');
-            error_log("SQLite selected after MySQL request. host={$host} db={$name} env=" . getEnv('APP_ENV', ''));
+            $host = env_get('DB_HOST', '');
+            $name = env_get('DB_NAME', '');
+            error_log("SQLite selected after MySQL request. host={$host} db={$name} env=" . env_get('APP_ENV', ''));
         } else {
             error_log("SQLite selected by configuration (DB_TYPE={$requestedDbType}).");
         }
         $defaultDbFile = dirname(__DIR__) . '/data/scrabble.db';
-        $rawDbFile = trim((string)getEnv('DB_FILE', $defaultDbFile));
+        $rawDbFile = trim((string)env_get('DB_FILE', $defaultDbFile));
         if ($rawDbFile === '') {
             $dbFile = $defaultDbFile;
         } else {
@@ -385,3 +385,4 @@ try {
     }
 }
 ?>
+

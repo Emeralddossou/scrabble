@@ -1,9 +1,9 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrabble FranÃ§ais - Connexion</title>
+    <title>Scrabble Français - Connexion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,11 +16,11 @@
                 <div class="brand-mark">S</div>
                 <div>
                     <h1>Scrabble FR</h1>
-                    <p class="brand-sub">CompÃ©titif. Ã‰lÃ©gant. Moderne.</p>
+                    <p class="brand-sub">Compétitif. Élégant. Moderne.</p>
                 </div>
             </div>
 
-            <p class="muted center">Connectez-vous pour entrer dans lâ€™arÃ¨ne.</p>
+            <p class="muted center">Connectez-vous pour entrer dans l’arène.</p>
 
             <div class="auth-toggle">
                 <button id="toggle-login" class="active" type="button">Connexion</button>
@@ -37,26 +37,26 @@
                 <input type="text" id="register-username" placeholder="Nom d'utilisateur" required maxlength="20" autocomplete="username">
                 <input type="password" id="register-password" placeholder="Mot de passe (min 8)" required minlength="8" autocomplete="new-password">
                 <input type="password" id="register-password-confirm" placeholder="Confirmer le mot de passe" required minlength="8" autocomplete="new-password">
-                <button type="submit">CrÃ©er le compte</button>
+                <button type="submit">Créer le compte</button>
             </form>
 
             <div class="auth-reset">
-                <button id="toggle-reset" type="button" class="btn-ghost">Mot de passe oubliÃ© ?</button>
+                <button id="toggle-reset" type="button" class="btn-ghost">Mot de passe oublié ?</button>
             </div>
 
             <form id="reset-form" style="display:none;">
                 <input type="text" id="reset-username" placeholder="Nom d'utilisateur" required maxlength="20" autocomplete="username">
-                <input type="text" id="reset-token" placeholder="Code de rÃ©initialisation" required>
+                <input type="text" id="reset-token" placeholder="Code de réinitialisation" required>
                 <input type="password" id="reset-password" placeholder="Nouveau mot de passe (min 8)" required minlength="8" autocomplete="new-password">
                 <button type="button" id="request-reset">Demander un code</button>
-                <button type="submit">RÃ©initialiser</button>
+                <button type="submit">Réinitialiser</button>
             </form>
         </div>
     </div>
     <?php
         require_once __DIR__ . '/backend/env.php';
-        $appEnv = getEnv('APP_ENV', 'development');
-        $appDebug = strtolower((string)getEnv('APP_DEBUG', 'false'));
+        $appEnv = env_get('APP_ENV', 'development');
+        $appDebug = strtolower((string)env_get('APP_DEBUG', 'false'));
         $appDebug = in_array($appDebug, ['1', 'true', 'yes', 'on'], true);
     ?>
     <script>
@@ -66,3 +66,4 @@
     <script src="js/app.js"></script>
 </body>
 </html>
+

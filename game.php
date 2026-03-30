@@ -1,9 +1,9 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrabble FranÃ§ais - Partie</title>
+    <title>Scrabble Français - Partie</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -38,15 +38,15 @@
                 <div id="rack" class="glass-card"></div>
 
                 <div id="exchange-banner" class="exchange-banner" style="display:none;">
-                    SÃ©lectionnez des lettres Ã  Ã©changer, puis confirmez.
+                    Sélectionnez des lettres à échanger, puis confirmez.
                 </div>
 
                 <div class="game-actions">
                     <button id="btn-submit" onclick="submitMove()">Valider</button>
                     <button id="btn-recall" onclick="recallTiles()">Rappeler</button>
-                    <button id="btn-shuffle" onclick="shuffleRack()">MÃ©langer</button>
-                    <button id="btn-exchange" onclick="toggleExchangeMode()">Ã‰changer</button>
-                    <button id="btn-cancel-exchange" onclick="cancelExchangeMode()" class="btn-muted" style="display:none;">Annuler Ã©change</button>
+                    <button id="btn-shuffle" onclick="shuffleRack()">Mélanger</button>
+                    <button id="btn-exchange" onclick="toggleExchangeMode()">Échanger</button>
+                    <button id="btn-cancel-exchange" onclick="cancelExchangeMode()" class="btn-muted" style="display:none;">Annuler échange</button>
                     <button id="btn-pass" onclick="passTurn()" class="btn-muted">Passer</button>
                     <button id="btn-resign" onclick="resignGame()" class="btn-danger">Abandonner</button>
                 </div>
@@ -59,7 +59,7 @@
                 <hr class="divider">
 
                 <div id="tile-bag-info">
-                    PiÃ¨ces restantes: <span id="bag-count">--</span>
+                    Pièces restantes: <span id="bag-count">--</span>
                 </div>
 
                 <div class="score-preview">
@@ -96,8 +96,8 @@
 
     <?php
         require_once __DIR__ . '/backend/env.php';
-        $appEnv = getEnv('APP_ENV', 'development');
-        $appDebug = strtolower((string)getEnv('APP_DEBUG', 'false'));
+        $appEnv = env_get('APP_ENV', 'development');
+        $appDebug = strtolower((string)env_get('APP_DEBUG', 'false'));
         $appDebug = in_array($appDebug, ['1', 'true', 'yes', 'on'], true);
     ?>
     <script>
@@ -108,3 +108,4 @@
     <script src="js/game.js"></script>
 </body>
 </html>
+
