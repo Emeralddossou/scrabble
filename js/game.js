@@ -456,6 +456,19 @@ function updateBoardUI(serverBoard) {
             }
         }
     }
+
+    // Ensure temporary placements remain visible after refresh/polling
+    temporaryPlacements.forEach(temp => {
+        if (serverBoard[temp.r]?.[temp.c]) return;
+        const cell = document.querySelector(`.cell[data-r='${temp.r}'][data-c='${temp.c}']`);
+        if (!cell) return;
+        cell.innerHTML = '';
+        const tile = createTileElement(temp.letter, false);
+        if (temp.rack_letter) {
+            tile.dataset.rackLetter = temp.rack_letter;
+        }
+        cell.appendChild(tile);
+    });
 }
 
 function renderRack() {

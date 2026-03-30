@@ -378,7 +378,7 @@ try {
     if (function_exists('json_error')) {
         json_error('Erreur serveur', 500, $debug, $debug);
     } else {
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=utf-8');
         http_response_code(500);
         echo json_encode(['error' => 'Erreur serveur']);
         exit;

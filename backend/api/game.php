@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // backend/api/game.php
 
 require_once '../bootstrap.php';
@@ -7,7 +7,7 @@ require_once '../GameLogic.php';
 require_once '../Logger.php';
 require_once '../env.php';
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // Phase 7: Performance tracking
 $startTime = microtime(true);
@@ -248,16 +248,16 @@ if ($action === 'invite') {
 
 } elseif ($action === 'list') {
     $stmt = $pdo->prepare("
-        SELECT g.id, g.status, g.current_player_id, g.winner_id, g.ended_at,
-               u1.username as player1, u2.username as player2,
+        SELECT g.id, g.status, g.current_player_id, g.winner_id, g.ended_at, g.is_solo,
+               u1.username as player1,
+               CASE WHEN g.is_solo = 1 THEN 'Solo' ELSE u2.username END as player2,
                gp.score as my_score
         FROM games g
-        JOIN game_players gp ON g.id = gp.game_id
+        JOIN game_players gp ON g.id = gp.game_id AND gp.user_id = ?
         JOIN game_players gp1 ON g.id = gp1.game_id AND gp1.turn_order = 1
         JOIN users u1 ON gp1.user_id = u1.id
-        JOIN game_players gp2 ON g.id = gp2.game_id AND gp2.turn_order = 2
-        JOIN users u2 ON gp2.user_id = u2.id
-        WHERE gp.user_id = ?
+        LEFT JOIN game_players gp2 ON g.id = gp2.game_id AND gp2.turn_order = 2
+        LEFT JOIN users u2 ON gp2.user_id = u2.id
         ORDER BY g.updated_at DESC
     ");
     $stmt->execute([$user_id]);
@@ -269,16 +269,17 @@ if ($action === 'invite') {
         json_error('Utilisateur invalide', 400);
     }
     $stmt = $pdo->prepare("
-        SELECT g.id, g.status, g.current_player_id, g.winner_id, g.ended_at,
+        SELECT g.id, g.status, g.current_player_id, g.winner_id, g.ended_at, g.is_solo,
                gp.score as user_score,
                u1.id as player1_id, u1.username as player1,
-               u2.id as player2_id, u2.username as player2
+               u2.id as player2_id,
+               CASE WHEN g.is_solo = 1 THEN 'Solo' ELSE u2.username END as player2
         FROM games g
         JOIN game_players gp ON g.id = gp.game_id AND gp.user_id = ?
         JOIN game_players gp1 ON g.id = gp1.game_id AND gp1.turn_order = 1
         JOIN users u1 ON gp1.user_id = u1.id
-        JOIN game_players gp2 ON g.id = gp2.game_id AND gp2.turn_order = 2
-        JOIN users u2 ON gp2.user_id = u2.id
+        LEFT JOIN game_players gp2 ON g.id = gp2.game_id AND gp2.turn_order = 2
+        LEFT JOIN users u2 ON gp2.user_id = u2.id
         ORDER BY g.updated_at DESC
         LIMIT 50
     ");
@@ -454,11 +455,14 @@ if ($action === 'invite') {
             $rack = array_merge($rack, $newTiles);
         }
         
-        $stmt = $pdo->prepare("UPDATE games SET board = ?, bag = ?, current_player_id = (SELECT user_id FROM game_players WHERE game_id = ? AND user_id != ?), updated_at = CURRENT_TIMESTAMP, last_move_at = CURRENT_TIMESTAMP, consecutive_passes = 0 WHERE id = ?");
-        $stmt->execute([json_encode($board), json_encode($bag), $game_id, $user_id, $game_id]);
+        $stmt = $pdo->prepare("UPDATE games SET board = ?, bag = ?, current_player_id = CASE WHEN is_solo = 1 THEN ? ELSE (SELECT user_id FROM game_players WHERE game_id = ? AND user_id != ?) END, updated_at = CURRENT_TIMESTAMP, last_move_at = CURRENT_TIMESTAMP, consecutive_passes = 0 WHERE id = ?");
+        $stmt->execute([json_encode($board), json_encode($bag), $user_id, $game_id, $user_id, $game_id]);
         
         $stmt = $pdo->prepare("UPDATE game_players SET rack = ? WHERE game_id = ? AND user_id = ?");
         $stmt->execute([json_encode($rack), $game_id, $user_id]);
+        if (isset($_SESSION['game_placements'][$game_id])) {
+            unset($_SESSION['game_placements'][$game_id]);
+        }
         
         $mainWord = strtoupper($validation['words'][0]['word']);
         logMove($pdo, $game_id, $user_id, 'play', $mainWord, $validation['score'], json_encode($movesForLogic), null);
@@ -551,8 +555,11 @@ if ($action === 'invite') {
 
     $stmt = $pdo->prepare("UPDATE game_players SET rack = ? WHERE game_id = ? AND user_id = ?");
     $stmt->execute([json_encode($rack), $game_id, $user_id]);
-    $stmt = $pdo->prepare("UPDATE games SET bag = ?, current_player_id = (SELECT user_id FROM game_players WHERE game_id = ? AND user_id != ?), updated_at = CURRENT_TIMESTAMP, last_move_at = CURRENT_TIMESTAMP, consecutive_passes = consecutive_passes + 1 WHERE id = ?");
-    $stmt->execute([json_encode($bag), $game_id, $user_id, $game_id]);
+    $stmt = $pdo->prepare("UPDATE games SET bag = ?, current_player_id = CASE WHEN is_solo = 1 THEN ? ELSE (SELECT user_id FROM game_players WHERE game_id = ? AND user_id != ?) END, updated_at = CURRENT_TIMESTAMP, last_move_at = CURRENT_TIMESTAMP, consecutive_passes = consecutive_passes + 1 WHERE id = ?");
+    $stmt->execute([json_encode($bag), $user_id, $game_id, $user_id, $game_id]);
+    if (isset($_SESSION['game_placements'][$game_id])) {
+        unset($_SESSION['game_placements'][$game_id]);
+    }
 
     logMove($pdo, $game_id, $user_id, 'exchange', null, 0, null, json_encode(['count' => count($letters)]));
 
@@ -595,8 +602,11 @@ if ($action === 'invite') {
         json_error('Not your turn');
     }
 
-    $stmt = $pdo->prepare("UPDATE games SET current_player_id = (SELECT user_id FROM game_players WHERE game_id = ? AND user_id != ?), updated_at = CURRENT_TIMESTAMP, last_move_at = CURRENT_TIMESTAMP, consecutive_passes = consecutive_passes + 1 WHERE id = ?");
-    $stmt->execute([$game_id, $user_id, $game_id]);
+    $stmt = $pdo->prepare("UPDATE games SET current_player_id = CASE WHEN is_solo = 1 THEN ? ELSE (SELECT user_id FROM game_players WHERE game_id = ? AND user_id != ?) END, updated_at = CURRENT_TIMESTAMP, last_move_at = CURRENT_TIMESTAMP, consecutive_passes = consecutive_passes + 1 WHERE id = ?");
+    $stmt->execute([$user_id, $game_id, $user_id, $game_id]);
+    if (isset($_SESSION['game_placements'][$game_id])) {
+        unset($_SESSION['game_placements'][$game_id]);
+    }
     
     logMove($pdo, $game_id, $user_id, 'pass', null, 0, null, null);
 
@@ -694,3 +704,5 @@ if ($duration > 1000) {
     ]);
 }
 ?>
+
+

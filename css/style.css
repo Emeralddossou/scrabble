@@ -39,7 +39,8 @@ body {
 }
 
 body.page-game {
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 body::before {
@@ -63,7 +64,8 @@ body::before {
 
 .page-game .container {
     width: 100%;
-    height: 100vh;
+    min-height: 100vh;
+    height: auto;
     margin: 0;
     padding: 16px;
 }
@@ -231,7 +233,9 @@ select:focus-visible {
     display: grid;
     grid-template-columns: minmax(280px, 1fr) minmax(280px, 380px);
     gap: 20px;
-    height: calc(100vh - 32px);
+    min-height: calc(100vh - 32px);
+    height: auto;
+    align-items: start;
 }
 
 .game-main {
@@ -304,7 +308,7 @@ select:focus-visible {
         linear-gradient(145deg, #16233f, #0e1627),
         radial-gradient(circle at 20% 20%, rgba(245, 158, 11, 0.2), transparent 60%);
     box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.06);
-    width: min(62vh, 680px, 86vw);
+    width: min(60vh, 680px, 92vw);
     aspect-ratio: 1;
     touch-action: none;
 }
@@ -559,7 +563,8 @@ select:focus-visible {
     .game-layout {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr auto;
-        height: calc(100vh - 32px);
+        min-height: calc(100vh - 32px);
+        height: auto;
     }
     .game-sidebar {
         max-height: 28vh;

@@ -38,7 +38,7 @@ function request_id() {
 $isSecure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 
 if (is_production() && !$isSecure) {
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
     http_response_code(403);
     echo json_encode(['error' => 'HTTPS requis en production']);
     exit;
@@ -56,7 +56,7 @@ request_id();
 
 function send_json($payload, $httpCode = 200) {
     if (!headers_sent()) {
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=utf-8');
         http_response_code($httpCode);
     }
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
