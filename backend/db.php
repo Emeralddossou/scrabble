@@ -5,6 +5,7 @@ require_once __DIR__ . '/env.php';
 
 // Get database configuration from .env
 $db_type = strtolower(getEnv('DB_TYPE', 'mysql'));
+$requestedDbType = $db_type;
 $pdo = null;
 $allowFallback = true;
 if (function_exists('is_production')) {
@@ -39,10 +40,12 @@ try {
             $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             $pdo->exec("USE `$db_name`");
         } catch (Exception $e) {
+            error_log("MySQL connection error: " . $e->getMessage());
             if ($allowFallback) {
-                error_log("MySQL connection failed, falling back to SQLite: " . $e->getMessage());
+                error_log("MySQL connection failed, falling back to SQLite. allowFallback=true");
                 $db_type = 'sqlite';
             } else {
+                error_log("MySQL connection failed and fallback is disabled. allowFallback=false");
                 throw $e;
             }
         }
@@ -50,6 +53,13 @@ try {
 
     if ($db_type !== 'mysql') {
         // SQLite Connection (fallback or explicit)
+        if ($requestedDbType === 'mysql') {
+            $host = getEnv('DB_HOST', '');
+            $name = getEnv('DB_NAME', '');
+            error_log("SQLite selected after MySQL request. host={$host} db={$name} env=" . getEnv('APP_ENV', ''));
+        } else {
+            error_log("SQLite selected by configuration (DB_TYPE={$requestedDbType}).");
+        }
         $defaultDbFile = dirname(__DIR__) . '/data/scrabble.db';
         $rawDbFile = trim((string)getEnv('DB_FILE', $defaultDbFile));
         if ($rawDbFile === '') {
