@@ -50,21 +50,25 @@ try {
 
     if ($db_type !== 'mysql') {
         // SQLite Connection (fallback or explicit)
-        $dbFile = trim((string)getEnv('DB_FILE', dirname(__DIR__) . '/data/scrabble.db'));
-        if ($dbFile === '' || preg_match('/[\/\\\\]$/', $dbFile)) {
-            $dbFile = rtrim($dbFile, '/\\') . '/scrabble.db';
+        $defaultDbFile = dirname(__DIR__) . '/data/scrabble.db';
+        $rawDbFile = trim((string)getEnv('DB_FILE', $defaultDbFile));
+        if ($rawDbFile === '') {
+            $dbFile = $defaultDbFile;
+        } else {
+            $dbFile = $rawDbFile;
+            if (preg_match('/[\/\\\\]$/', $dbFile)) {
+                $dbFile = rtrim($dbFile, '/\\') . '/scrabble.db';
+            }
         }
         if (!preg_match('/^([A-Za-z]:)?[\/\\\\]/', $dbFile)) {
             $dbFile = dirname(__DIR__) . '/' . ltrim($dbFile, '/\\');
         }
         $dbFile = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $dbFile);
-        $appRoot = realpath(dirname(__DIR__));
-        if ($appRoot) {
-            $normalizedRoot = rtrim($appRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $appRoot = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, dirname(__DIR__)), DIRECTORY_SEPARATOR);
+        if ($appRoot !== '') {
+            $normalizedRoot = $appRoot . DIRECTORY_SEPARATOR;
             $dbDirCandidate = dirname($dbFile);
-            $dbDirReal = realpath($dbDirCandidate);
-            $dbDirCheck = $dbDirReal ? rtrim($dbDirReal, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : $dbDirCandidate;
-            if (stripos($dbDirCheck, $normalizedRoot) !== 0) {
+            if (strpos($dbDirCandidate, $normalizedRoot) !== 0) {
                 error_log("DB_FILE outside app root, falling back to app data directory.");
                 $dbFile = $normalizedRoot . 'data' . DIRECTORY_SEPARATOR . 'scrabble.db';
             }
