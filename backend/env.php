@@ -4,10 +4,21 @@
 if (!function_exists('loadEnv')) {
     function loadEnv($filePath = null) {
         if (!$filePath) {
-            $filePath = dirname(__DIR__) . '/.env';
+            $base = dirname(__DIR__);
+            $candidates = [
+                $base . '/.env',
+                $base . '/env.production',
+                $base . '/env'
+            ];
+            foreach ($candidates as $candidate) {
+                if (file_exists($candidate)) {
+                    $filePath = $candidate;
+                    break;
+                }
+            }
         }
         
-        if (!file_exists($filePath)) {
+        if (!$filePath || !file_exists($filePath)) {
             return [];
         }
         

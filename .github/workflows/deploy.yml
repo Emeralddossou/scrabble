@@ -92,6 +92,7 @@ jobs:
           APP_ENV=production
           APP_DEBUG=false
           EOF
+          cp .env env.production
       
       - name: Setup FTP Deploy Action
         uses: milanmk/actions-file-deployer@master

@@ -4,8 +4,14 @@
 require_once __DIR__ . '/env.php';
 
 // Get database configuration from .env
-$db_type = strtolower(getEnv('DB_TYPE', 'mysql'));
+$rawDbType = (string)getEnv('DB_TYPE', 'mysql');
+$db_type = strtolower(trim($rawDbType));
 $requestedDbType = $db_type;
+if ($db_type === '') {
+    error_log("DB_TYPE is empty. Check .env path/contents (dotfiles may not be uploaded). Falling back to mysql.");
+    $db_type = 'mysql';
+    $requestedDbType = 'mysql';
+}
 $pdo = null;
 $allowFallback = true;
 if (function_exists('is_production')) {
