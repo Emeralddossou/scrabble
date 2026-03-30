@@ -9,6 +9,9 @@ $db_type = strtolower(trim($rawDbType));
 $requestedDbType = $db_type;
 if ($db_type === '') {
     error_log("DB_TYPE is empty. Check .env path/contents (dotfiles may not be uploaded). Falling back to mysql.");
+    if (function_exists('env_debug_info')) {
+        error_log("Env debug: " . json_encode(env_debug_info()));
+    }
     $db_type = 'mysql';
     $requestedDbType = 'mysql';
 }

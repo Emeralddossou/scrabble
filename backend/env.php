@@ -27,16 +27,41 @@ if (!function_exists('loadEnv')) {
         }
         
         $env = [];
-        $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($lines === false) {
+        $contents = @file_get_contents($filePath);
+        if ($contents === false) {
             error_log("Env file not readable: " . $filePath);
             return [];
         }
         error_log("Env loaded from: " . $filePath);
+
+        // Handle UTF-16 encoded files (common when saved via Windows Notepad)
+        if (strpos($contents, "\0") !== false) {
+            $encoding = null;
+            if (substr($contents, 0, 2) === "\xFF\xFE") {
+                $encoding = 'UTF-16LE';
+            } elseif (substr($contents, 0, 2) === "\xFE\xFF") {
+                $encoding = 'UTF-16BE';
+            } else {
+                $encoding = 'UTF-16LE';
+            }
+            if (function_exists('mb_convert_encoding')) {
+                $contents = mb_convert_encoding($contents, 'UTF-8', $encoding);
+            } elseif (function_exists('iconv')) {
+                $contents = iconv($encoding, 'UTF-8//IGNORE', $contents);
+            }
+            error_log("Env file encoding converted from {$encoding} to UTF-8.");
+        }
+
+        $lines = preg_split("/\r\n|\n|\r/", $contents);
+        if ($lines === false) {
+            error_log("Env file parse failed: " . $filePath);
+            return [];
+        }
         
         foreach ($lines as $line) {
             // Skip comments
             if (strpos(trim($line), '#') === 0) continue;
+            if (trim($line) === '') continue;
             
             // Parse key=value
             if (strpos($line, '=') !== false) {
@@ -56,6 +81,46 @@ if (!function_exists('loadEnv')) {
         }
         error_log("Env keys loaded: " . count($env));
         return $env;
+    }
+}
+
+if (!function_exists('env_debug_info')) {
+    function env_debug_info() {
+        $base = dirname(__DIR__);
+        $candidates = [
+            $base . '/.env',
+            $base . '/env.production',
+            $base . '/env'
+        ];
+        $info = [];
+        foreach ($candidates as $candidate) {
+            $exists = file_exists($candidate);
+            $readable = $exists ? is_readable($candidate) : false;
+            $size = $exists ? @filesize($candidate) : 0;
+            $sample = '';
+            $hasBom = false;
+            $hasNulls = false;
+            if ($readable) {
+                $sample = @file_get_contents($candidate, false, null, 0, 4);
+                if ($sample !== false) {
+                    if (substr($sample, 0, 3) === "\xEF\xBB\xBF" || substr($sample, 0, 2) === "\xFF\xFE" || substr($sample, 0, 2) === "\xFE\xFF") {
+                        $hasBom = true;
+                    }
+                    if (strpos($sample, "\0") !== false) {
+                        $hasNulls = true;
+                    }
+                }
+            }
+            $info[] = [
+                'path' => $candidate,
+                'exists' => $exists ? 1 : 0,
+                'readable' => $readable ? 1 : 0,
+                'size' => $size,
+                'bom' => $hasBom ? 1 : 0,
+                'nulls' => $hasNulls ? 1 : 0
+            ];
+        }
+        return $info;
     }
 }
 
