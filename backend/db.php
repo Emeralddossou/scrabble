@@ -2,9 +2,15 @@
 // backend/db.php - Phase 3: Support MySQL and SQLite
 
 require_once __DIR__ . '/env.php';
+error_log("DB.PHP LOADED db-2026-03-30-1836");
+if (defined('ENV_PHP_VERSION')) {
+    error_log("ENV.PHP VERSION: " . ENV_PHP_VERSION);
+}
+error_log("ENV functions: loadEnv=" . (function_exists('loadEnv') ? '1' : '0') . " readEnvFile=" . (function_exists('readEnvFile') ? '1' : '0'));
 
 // Get database configuration from .env
 $rawDbType = (string)getEnv('DB_TYPE', 'mysql');
+error_log("DB_TYPE raw length=" . strlen($rawDbType));
 $db_type = strtolower(trim($rawDbType));
 $requestedDbType = $db_type;
 if ($db_type === '') {
@@ -37,6 +43,7 @@ try {
             $db_user = getEnv('DB_USER', '');
             $db_pass = getEnv('DB_PASS', '');
             $db_name = getEnv('DB_NAME', 'scrabble');
+            error_log("DB env lengths: host=" . strlen((string)$db_host) . " user=" . strlen((string)$db_user) . " name=" . strlen((string)$db_name));
             
             if (!$db_user) {
                 throw new Exception('MySQL credentials not configured in .env');

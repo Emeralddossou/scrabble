@@ -1,8 +1,15 @@
 <?php
 // backend/env.php - Load .env file
 
+// Version marker to verify deployment
+if (!defined('ENV_PHP_VERSION')) {
+    define('ENV_PHP_VERSION', 'env-2026-03-30-1836');
+}
+error_log("ENV.PHP LOADED " . ENV_PHP_VERSION . " from " . __FILE__);
+
 if (!function_exists('loadEnv')) {
     function loadEnv($filePath = null) {
+        error_log("ENV STEP: loadEnv start");
         if (!$filePath) {
             $base = dirname(__DIR__);
             $candidates = [
@@ -96,6 +103,7 @@ if (!function_exists('loadEnv')) {
             }
             error_log("Env keys loaded: " . count($env) . " [" . implode(',', $keyInfo) . "]");
         }
+        error_log("ENV STEP: loadEnv end (keys=" . count($env) . ")");
         return $env;
     }
 }
