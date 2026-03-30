@@ -46,15 +46,15 @@ async function api(endpoint, method = 'GET', body = null, options = {}) {
     if (method !== 'GET' && csrfToken) {
         headers['X-CSRF-Token'] = csrfToken;
     }
-    const options = {
+    const requestOptions = {
         method,
         headers,
         credentials: 'same-origin'
     };
-    if (body) options.body = JSON.stringify(body);
+    if (body) requestOptions.body = JSON.stringify(body);
 
     try {
-        const res = await fetch(`${API_BASE}/${endpoint}`, options);
+        const res = await fetch(`${API_BASE}/${endpoint}`, requestOptions);
         const text = await res.text();
         let data = null;
         try {
