@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrabble Français - Replay</title>
+    <title>Scrabble FranÃ§ais - Replay</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
         <div class="glass-card replay-header">
             <div>
                 <h2>Replay Partie #<span id="game-id-display"></span></h2>
-                <p class="muted">Revivez les coups clés, un par un.</p>
+                <p class="muted">Revivez les coups clÃ©s, un par un.</p>
             </div>
             <button class="btn-ghost" onclick="window.location.href='dashboard.php'">Retour</button>
         </div>
@@ -23,9 +23,9 @@
             <div id="board" class="replay-board" style="pointer-events: none;"></div>
 
             <div class="glass-card replay-controls">
-                <h3>Contrôles</h3>
+                <h3>ContrÃ´les</h3>
                 <div class="replay-actions">
-                    <button onclick="prevMove()">Précédent</button>
+                    <button onclick="prevMove()">PrÃ©cÃ©dent</button>
                     <button onclick="nextMove()">Suivant</button>
                     <button onclick="autoPlay()">Auto</button>
                 </div>
