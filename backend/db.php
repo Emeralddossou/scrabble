@@ -50,18 +50,38 @@ try {
 
     if ($db_type !== 'mysql') {
         // SQLite Connection (fallback or explicit)
-        $dbFile = getEnv('DB_FILE', dirname(__DIR__) . '/data/scrabble.db');
+        $dbFile = trim((string)getEnv('DB_FILE', dirname(__DIR__) . '/data/scrabble.db'));
+        if ($dbFile === '' || preg_match('/[\/\\\\]$/', $dbFile)) {
+            $dbFile = rtrim($dbFile, '/\\') . '/scrabble.db';
+        }
         if (!preg_match('/^([A-Za-z]:)?[\/\\\\]/', $dbFile)) {
             $dbFile = dirname(__DIR__) . '/' . ltrim($dbFile, '/\\');
         }
         $dbFile = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $dbFile);
-        
+        $appRoot = realpath(dirname(__DIR__));
+        if ($appRoot) {
+            $normalizedRoot = rtrim($appRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+            $dbDirCandidate = dirname($dbFile);
+            $dbDirReal = realpath($dbDirCandidate);
+            $dbDirCheck = $dbDirReal ? rtrim($dbDirReal, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : $dbDirCandidate;
+            if (stripos($dbDirCheck, $normalizedRoot) !== 0) {
+                error_log("DB_FILE outside app root, falling back to app data directory.");
+                $dbFile = $normalizedRoot . 'data' . DIRECTORY_SEPARATOR . 'scrabble.db';
+            }
+        }
+
         error_log("Using SQLite path: " . $dbFile);
         
         $dbDir = dirname($dbFile);
         if (!is_dir($dbDir)) {
             error_log("Creating dir: " . $dbDir);
-            @mkdir($dbDir, 0777, true);
+            if (!@mkdir($dbDir, 0777, true)) {
+                if ($appRoot) {
+                    $fallbackFile = rtrim($appRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'scrabble.db';
+                    error_log("Failed to create DB dir, falling back to: " . $fallbackFile);
+                    $dbFile = $fallbackFile;
+                }
+            }
         }
         
         error_log("Connecting to: sqlite:" . $dbFile);
