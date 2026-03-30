@@ -24,6 +24,11 @@ if (!function_exists('loadEnv')) {
         
         $env = [];
         $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            error_log("Env file not readable: " . $filePath);
+            return [];
+        }
+        error_log("Env loaded from: " . $filePath);
         
         foreach ($lines as $line) {
             // Skip comments
@@ -33,6 +38,8 @@ if (!function_exists('loadEnv')) {
             if (strpos($line, '=') !== false) {
                 list($key, $value) = explode('=', $line, 2);
                 $key = trim($key);
+                // Strip UTF-8 BOM if present (common when editing on Windows)
+                $key = preg_replace('/^\xEF\xBB\xBF/', '', $key);
                 $value = trim($value);
                 
                 // Remove quotes if present
@@ -43,7 +50,7 @@ if (!function_exists('loadEnv')) {
                 $env[$key] = $value;
             }
         }
-        
+        error_log("Env keys loaded: " . count($env));
         return $env;
     }
 }
