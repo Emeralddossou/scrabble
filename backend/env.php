@@ -11,7 +11,10 @@ if (!function_exists('loadEnv')) {
                 $base . '/env'
             ];
             foreach ($candidates as $candidate) {
-                if (file_exists($candidate)) {
+                $exists = file_exists($candidate);
+                $readable = $exists ? is_readable($candidate) : false;
+                error_log("Env candidate: {$candidate} exists=" . ($exists ? '1' : '0') . " readable=" . ($readable ? '1' : '0'));
+                if ($exists && $readable) {
                     $filePath = $candidate;
                     break;
                 }
@@ -19,6 +22,7 @@ if (!function_exists('loadEnv')) {
         }
         
         if (!$filePath || !file_exists($filePath)) {
+            error_log("No env file found. Checked .env, env.production, env in app root.");
             return [];
         }
         
