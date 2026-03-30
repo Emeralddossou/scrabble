@@ -64,18 +64,16 @@ if (!function_exists('loadEnv')) {
             if (trim($line) === '') continue;
             
             // Parse key=value
-            if (strpos($line, '=') !== false) {
-                list($key, $value) = explode('=', $line, 2);
-                $key = trim($key);
+            if (preg_match('/^\s*(?:export\s+)?([A-Za-z0-9_.-]+)\s*=\s*(.*)$/', $line, $m)) {
+                $key = $m[1];
+                $value = $m[2];
                 // Strip UTF-8 BOM if present (common when editing on Windows)
                 $key = preg_replace('/^\xEF\xBB\xBF/', '', $key);
-                // Remove "export " if present
-                $key = preg_replace('/^export\s+/i', '', $key);
                 $value = trim($value, " \t\n\r\0\x0B");
                 
                 // Remove quotes if present
-                if (preg_match('/^["\'](.+)["\']$/', $value, $m)) {
-                    $value = $m[1];
+                if (preg_match('/^["\'](.+)["\']$/', $value, $m2)) {
+                    $value = $m2[1];
                 }
                 
                 $env[$key] = $value;
@@ -145,7 +143,12 @@ if (!function_exists('env_debug_info')) {
 if (!function_exists('getEnv')) {
     function getEnv($key, $default = null) {
         static $env = null;
+        static $reloaded = false;
         if ($env === null) {
+            $env = loadEnv();
+        }
+        if (!$reloaded && is_array($env) && count($env) === 0) {
+            $reloaded = true;
             $env = loadEnv();
         }
         
