@@ -69,7 +69,9 @@ if (!function_exists('loadEnv')) {
                 $key = trim($key);
                 // Strip UTF-8 BOM if present (common when editing on Windows)
                 $key = preg_replace('/^\xEF\xBB\xBF/', '', $key);
-                $value = trim($value);
+                // Remove "export " if present
+                $key = preg_replace('/^export\s+/i', '', $key);
+                $value = trim($value, " \t\n\r\0\x0B");
                 
                 // Remove quotes if present
                 if (preg_match('/^["\'](.+)["\']$/', $value, $m)) {
@@ -79,7 +81,23 @@ if (!function_exists('loadEnv')) {
                 $env[$key] = $value;
             }
         }
-        error_log("Env keys loaded: " . count($env));
+        if (count($env) === 0) {
+            $rawKeys = [];
+            foreach ($lines as $line) {
+                if (preg_match('/^\s*([A-Za-z0-9_.-]+)\s*=/', $line, $m)) {
+                    $rawKeys[] = $m[1];
+                }
+            }
+            if (!empty($rawKeys)) {
+                error_log("Env raw keys detected (no values parsed): " . implode(',', $rawKeys));
+            }
+        } else {
+            $keyInfo = [];
+            foreach ($env as $k => $v) {
+                $keyInfo[] = $k . '=' . (strlen($v) > 0 ? '1' : '0');
+            }
+            error_log("Env keys loaded: " . count($env) . " [" . implode(',', $keyInfo) . "]");
+        }
         return $env;
     }
 }
