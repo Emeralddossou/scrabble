@@ -302,6 +302,44 @@ if (resetForm) {
 // Auth Check & Dashboard Logic
 let currentUser = null;
 let targetUserId = null;
+let activeModalId = null;
+
+function ensureModalBackdrop() {
+    if (document.getElementById('modal-backdrop')) return;
+    const backdrop = document.createElement('div');
+    backdrop.id = 'modal-backdrop';
+    backdrop.className = 'modal-backdrop';
+    backdrop.addEventListener('click', () => {
+        if (activeModalId) hideModal(activeModalId);
+    });
+    document.body.appendChild(backdrop);
+}
+
+function showModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    ensureModalBackdrop();
+    const backdrop = document.getElementById('modal-backdrop');
+    modal.style.display = 'block';
+    backdrop.classList.add('active');
+    document.body.classList.add('modal-open');
+    activeModalId = id;
+}
+
+function hideModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) modal.style.display = 'none';
+    const backdrop = document.getElementById('modal-backdrop');
+    if (backdrop) backdrop.classList.remove('active');
+    document.body.classList.remove('modal-open');
+    activeModalId = null;
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && activeModalId) {
+        hideModal(activeModalId);
+    }
+});
 
 async function checkAuth() {
     const res = await api('auth.php?action=me');
@@ -338,24 +376,23 @@ async function fetchDashboardData() {
     } else if (gamesRes.games && gamesRes.games.length > 0) {
         gamesRes.games.forEach(g => {
             const div = document.createElement('div');
-            div.className = 'game-item';
-            div.style.cssText = 'padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; gap: 8px;';
+            div.className = 'list-item';
             const isFinished = g.status === 'finished';
             const opponent = g.player1 === currentUser.username ? g.player2 : g.player1;
             const statusText = g.status === 'finished' ? 'Terminée' : (g.status === 'active' ? 'En cours' : (g.status || 'En cours'));
             div.innerHTML = `
                 <div>
                     <strong>vs ${opponent}</strong>
-                    <br><span style="font-size: 0.8em; opacity: 0.7;">${statusText} • ${isFinished ? 'Terminée' : (g.current_player_id == currentUser.id ? 'À vous' : 'Adversaire')}</span>
+                    <div class="list-meta">${statusText} • ${isFinished ? 'Terminée' : (g.current_player_id == currentUser.id ? 'À vous' : 'Adversaire')}</div>
                 </div>
-                <div style="display:flex; gap:6px;">
-                    ${isFinished ? `<button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="window.location.href='replay.php?id=${g.id}'">Replay</button>` : `<button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="window.location.href='game.php?id=${g.id}'">Jouer</button>`}
+                <div class="list-actions">
+                    ${isFinished ? `<button class="btn-compact" onclick="window.location.href='replay.php?id=${g.id}'">Replay</button>` : `<button class="btn-compact" onclick="window.location.href='game.php?id=${g.id}'">Jouer</button>`}
                 </div>
             `;
             gamesList.appendChild(div);
         });
     } else {
-        gamesList.innerHTML = '<p>Aucune partie pour le moment. Lancez une partie solo ou invitez un joueur.</p>';
+        gamesList.innerHTML = '<p class="list-empty">Aucune partie pour le moment. Lancez une partie solo ou invitez un joueur.</p>';
     }
 
     const usersRes = await api('auth.php?action=users');
@@ -367,18 +404,18 @@ async function fetchDashboardData() {
     } else if (usersRes.users && usersRes.users.length > 0) {
         usersRes.users.forEach(u => {
             const div = document.createElement('div');
-            div.style.cssText = 'padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;';
+            div.className = 'list-item';
             div.innerHTML = `
                 <span>${u.username}</span>
-                <div style="display:flex; gap:6px;">
-                    <button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="openProfileModal(${u.id}, '${u.username}')">Profil</button>
-                    <button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="openInviteModal(${u.id}, '${u.username}')">Inviter</button>
+                <div class="list-actions">
+                    <button class="btn-compact" onclick="openProfileModal(${u.id}, '${u.username}')">Profil</button>
+                    <button class="btn-compact" onclick="openInviteModal(${u.id}, '${u.username}')">Inviter</button>
                 </div>
             `;
             usersList.appendChild(div);
         });
     } else {
-        usersList.innerHTML = '<p>Aucun joueur en ligne pour l’instant.</p>';
+        usersList.innerHTML = '<p class="list-empty">Aucun joueur en ligne pour l’instant.</p>';
     }
 
     await fetchInvites();
@@ -398,22 +435,22 @@ async function fetchInvites() {
     } else if (res.invites && res.invites.length > 0) {
         res.invites.forEach(inv => {
             const div = document.createElement('div');
-            div.style.cssText = 'padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; gap: 8px;';
+            div.className = 'list-item';
             const modeLabel = inv.mode === 'timer' ? `Chrono ${inv.time_limit} min +${inv.increment} s` : 'Libre';
             div.innerHTML = `
                 <div>
                     <strong>${inv.from_username}</strong>
-                    <br><span style="font-size: 0.8em; opacity: 0.7;">${modeLabel}</span>
+                    <div class="list-meta">${modeLabel}</div>
                 </div>
-                <div style="display:flex; gap:6px;">
-                    <button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="acceptInvite(${inv.id})">Accepter</button>
-                    <button style="width: auto; padding: 5px 10px; font-size: 0.8em; background:#64748b;" onclick="declineInvite(${inv.id})">Refuser</button>
+                <div class="list-actions">
+                    <button class="btn-compact" onclick="acceptInvite(${inv.id})">Accepter</button>
+                    <button class="btn-compact btn-muted" onclick="declineInvite(${inv.id})">Refuser</button>
                 </div>
             `;
             invitesList.appendChild(div);
         });
     } else {
-        invitesList.innerHTML = '<p>Aucune invitation. Invitez un joueur en ligne.</p>';
+        invitesList.innerHTML = '<p class="list-empty">Aucune invitation. Invitez un joueur en ligne.</p>';
     }
 }
 
@@ -460,7 +497,7 @@ async function fetchLeaderboard() {
     } else if (res.success) {
         const leaders = res.leaders || [];
         if (leaders.length === 0) {
-            boardEl.innerHTML = '<p>Le classement apparaîtra après vos premières parties.</p>';
+            boardEl.innerHTML = '<p class="list-empty">Le classement apparaîtra après vos premières parties.</p>';
             return;
         }
         boardEl.innerHTML = leaders.map((l, idx) => (
@@ -482,7 +519,7 @@ async function openProfileModal(userId, username) {
     title.textContent = `Profil de ${username || 'Joueur'}`;
     statsEl.innerHTML = 'Chargement...';
     historyEl.innerHTML = '';
-    modal.style.display = 'block';
+    showModal('profile-modal');
 
     const res = await api(`auth.php?action=profile&user_id=${encodeURIComponent(userId)}`);
     if (!res.success) {
@@ -505,15 +542,15 @@ async function openProfileModal(userId, username) {
         historyEl.innerHTML = gamesRes.games.map(g => {
             const opponent = g.player1_id == userId ? g.player2 : g.player1;
             const isFinished = g.status === 'finished';
-            const statusLabel = isFinished ? 'Terminé' : 'En cours';
-            const actionBtn = isFinished ? `<button style="width:auto; padding:4px 8px;" onclick="window.location.href='replay.php?id=${g.id}'">Replay</button>` : `<button style="width:auto; padding:4px 8px;" onclick="window.location.href='game.php?id=${g.id}'">Jouer</button>`;
+            const statusLabel = isFinished ? 'Terminée' : 'En cours';
+            const actionBtn = isFinished ? `<button class="btn-compact" onclick="window.location.href='replay.php?id=${g.id}'">Replay</button>` : `<button class="btn-compact" onclick="window.location.href='game.php?id=${g.id}'">Jouer</button>`;
             return `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <div class="list-item">
                     <div>
                         <strong>vs ${opponent}</strong>
-                        <br><span class="muted" style="font-size:0.8rem;">${statusLabel}</span>
+                        <div class="list-meta">${statusLabel}</div>
                     </div>
-                    ${actionBtn}
+                    <div class="list-actions">${actionBtn}</div>
                 </div>
             `;
         }).join('');
@@ -523,8 +560,7 @@ async function openProfileModal(userId, username) {
 }
 
 function closeProfileModal() {
-    const modal = document.getElementById('profile-modal');
-    if (modal) modal.style.display = 'none';
+    hideModal('profile-modal');
 }
 
 const changePasswordForm = document.getElementById('change-password-form');
@@ -561,11 +597,11 @@ if (toggleSettingsBtn && passwordCard) {
 function openInviteModal(userId, username) {
     targetUserId = userId;
     document.getElementById('invite-target-name').textContent = username;
-    document.getElementById('invite-modal').style.display = 'block';
+    showModal('invite-modal');
 }
 
 function closeModal() {
-    document.getElementById('invite-modal').style.display = 'none';
+    hideModal('invite-modal');
     targetUserId = null;
 }
 
@@ -594,13 +630,11 @@ async function sendInvite() {
 
 // Phase 2: Solo game
 function openSoloModal() {
-    const modal = document.getElementById('solo-game-modal');
-    if (modal) modal.style.display = 'flex';
+    showModal('solo-game-modal');
 }
 
 function closeSoloModal() {
-    const modal = document.getElementById('solo-game-modal');
-    if (modal) modal.style.display = 'none';
+    hideModal('solo-game-modal');
 }
 
 async function createSoloGame() {

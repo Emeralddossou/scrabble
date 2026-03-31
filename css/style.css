@@ -138,6 +138,7 @@ button {
     letter-spacing: 0.2px;
     transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
     box-shadow: 0 12px 28px rgba(245, 158, 11, 0.25);
+    min-height: 44px;
 }
 
 .btn-primary {
@@ -180,6 +181,13 @@ select:focus-visible {
     width: auto;
     background: linear-gradient(135deg, #f43f5e, #fb7185);
     box-shadow: none;
+}
+
+.btn-compact {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    min-height: 36px;
 }
 
 .page-auth .auth-container {
@@ -309,6 +317,15 @@ select:focus-visible {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+.player-active {
+    color: #4ade80;
+    font-weight: 700;
+}
+
+.player-waiting {
+    color: #f87171;
 }
 
 .timer {
@@ -458,6 +475,10 @@ select:focus-visible {
     font-size: 0.9rem;
 }
 
+.exchange-mode #rack {
+    box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.5);
+}
+
 .game-actions {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -504,6 +525,18 @@ select:focus-visible {
     color: #fbbf24;
 }
 
+.score-preview.is-error {
+    border-color: rgba(244, 63, 94, 0.45);
+}
+
+.score-preview.is-error #preview-score {
+    color: #fca5a5;
+}
+
+.score-preview.is-error #preview-note {
+    color: #fecaca;
+}
+
 .mini-legend {
     margin-top: 14px;
     padding: 10px 12px;
@@ -544,6 +577,31 @@ select:focus-visible {
     gap: 20px;
 }
 
+.list-item {
+    padding: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.list-meta {
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+
+.list-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.list-empty {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
 /* Replay */
 .replay-header {
     margin-bottom: 20px;
@@ -575,6 +633,19 @@ select:focus-visible {
 }
 
 /* Modal */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 18, 0.6);
+    backdrop-filter: blur(6px);
+    z-index: 180;
+    display: none;
+}
+
+.modal-backdrop.active {
+    display: block;
+}
+
 .modal {
     position: fixed;
     top: 50%;
@@ -582,6 +653,10 @@ select:focus-visible {
     transform: translate(-50%, -50%);
     z-index: 200;
     min-width: 300px;
+}
+
+body.modal-open {
+    overflow: hidden;
 }
 
 .modal-actions {
@@ -687,6 +762,12 @@ select:focus-visible {
     }
     .game-header {
         gap: 6px;
+    }
+}
+
+@media (max-height: 720px) {
+    .game-hints {
+        display: none;
     }
 }
 

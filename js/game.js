@@ -373,6 +373,7 @@ async function fetchGameState() {
             p2NameEl.textContent = 'Mode Solo';
             p2NameEl.style.fontStyle = 'italic';
             p2NameEl.style.color = '#999';
+            p2NameEl.classList.remove('player-active', 'player-waiting');
         }
         document.getElementById('player2-score').textContent = '—';
         document.getElementById('p2-timer').textContent = '';
@@ -392,6 +393,14 @@ async function fetchGameState() {
     }
 
     isMyTurn = gameState.current_player_id == me;
+    if (p1NameEl && p1.user_id) {
+        p1NameEl.classList.toggle('player-active', p1.user_id == gameState.current_player_id);
+        p1NameEl.classList.toggle('player-waiting', p1.user_id != gameState.current_player_id);
+    }
+    if (p2NameEl && p2 && p2.user_id) {
+        p2NameEl.classList.toggle('player-active', p2.user_id == gameState.current_player_id);
+        p2NameEl.classList.toggle('player-waiting', p2.user_id != gameState.current_player_id);
+    }
     if (gameState.status === 'finished') {
         const winner = players.find(p => p.user_id == gameState.winner_id);
         document.getElementById('game-status').textContent = winner ? `Partie terminée — victoire de ${winner.username}` : 'Partie terminée — match nul';
@@ -797,6 +806,7 @@ function toggleExchangeMode() {
     }
     exchangeMode = true;
     exchangeSelections = new Set();
+    document.body.classList.add('exchange-mode');
     document.getElementById('exchange-banner').style.display = 'block';
     document.getElementById('btn-exchange').textContent = 'Confirmer l’échange';
     document.getElementById('btn-cancel-exchange').style.display = 'inline-block';
@@ -806,6 +816,7 @@ function toggleExchangeMode() {
 function cancelExchangeMode() {
     exchangeMode = false;
     exchangeSelections.clear();
+    document.body.classList.remove('exchange-mode');
     document.getElementById('exchange-banner').style.display = 'none';
     document.getElementById('btn-exchange').textContent = 'Échanger';
     document.getElementById('btn-cancel-exchange').style.display = 'none';
@@ -909,24 +920,29 @@ function renderHistory(moves) {
 function updatePreviewScore() {
     const scoreEl = document.getElementById('preview-score');
     const noteEl = document.getElementById('preview-note');
+    const previewCard = document.querySelector('.score-preview');
     if (!scoreEl || !noteEl) return;
     if (!lastBoard) {
         scoreEl.textContent = '0';
         noteEl.textContent = 'Placez des lettres pour voir une estimation.';
+        if (previewCard) previewCard.classList.remove('is-error');
         return;
     }
     if (temporaryPlacements.length === 0) {
         scoreEl.textContent = '0';
         noteEl.textContent = 'Placez des lettres pour voir une estimation.';
+        if (previewCard) previewCard.classList.remove('is-error');
         return;
     }
     const res = computeScorePreview(lastBoard, temporaryPlacements);
     if (!res.valid) {
         scoreEl.textContent = '0';
         noteEl.textContent = res.error;
+        if (previewCard) previewCard.classList.add('is-error');
     } else {
         scoreEl.textContent = res.score;
         noteEl.textContent = 'Estimation avant validation.';
+        if (previewCard) previewCard.classList.remove('is-error');
     }
 }
 
