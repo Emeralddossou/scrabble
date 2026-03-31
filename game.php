@@ -34,6 +34,7 @@
                 <div class="game-hints">
                     <p><strong>Astuce :</strong> glissez-déposez les lettres ou touchez une lettre puis une case.</p>
                     <p class="muted">Rappeler annule vos placements, Mélanger réorganise votre chevalet.</p>
+                    <p style="color:red"><strong>En cas d'erreur ou de bug, actualisez la page et priez. Si le problème n'est pas résolu, sachez qu'on aura fait de notre mieux. Merci !</strong></p>
                 </div>
 
                 <div id="game-container">

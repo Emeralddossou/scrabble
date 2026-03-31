@@ -219,6 +219,8 @@ function playSound(type) {
 
 let pollTimer = null;
 let savePlacementsTimer = null;
+let savePlacementsDebounce = null;
+let suppressSavedPlacementsUntil = 0;
 
 // Phase 7: Track API calls with timing
 async function apiWithMetrics(endpoint, method = 'GET', body = null) {
@@ -260,6 +262,21 @@ function startSavingPlacements() {
             // Silent fail, will retry next interval
         }
     }, 2500);
+}
+
+function scheduleSavePlacements() {
+    if (!isMyTurn) return;
+    if (savePlacementsDebounce) clearTimeout(savePlacementsDebounce);
+    savePlacementsDebounce = setTimeout(async () => {
+        try {
+            await apiWithMetrics('game.php?action=save_placements', 'POST', {
+                game_id: gameId,
+                placements: temporaryPlacements
+            });
+        } catch (err) {
+            // Silent fail, will retry on next change or interval
+        }
+    }, 300);
 }
 
 let serverTime = null;
@@ -325,7 +342,7 @@ async function fetchGameState() {
     serverTime = res.server_timestamp || Math.floor(Date.now() / 1000);
 
     // Restore saved placements when fetching game state
-    if (me == res.game.current_player_id && temporaryPlacements.length === 0) {
+    if (me == res.game.current_player_id && temporaryPlacements.length === 0 && Date.now() > suppressSavedPlacementsUntil) {
         const savedRes = await api(`game.php?action=load_placements&game_id=${gameId}`);
         if (savedRes?.placements && savedRes.placements.length > 0) {
             temporaryPlacements = savedRes.placements;
@@ -488,6 +505,23 @@ function renderRack() {
     });
 }
 
+function removePlacementAt(r, c) {
+    const idx = temporaryPlacements.findIndex(t => t.r === r && t.c === c);
+    if (idx > -1) temporaryPlacements.splice(idx, 1);
+}
+
+function restoreCellLabel(cell) {
+    if (!cell) return;
+    const r = parseInt(cell.dataset.r, 10);
+    const c = parseInt(cell.dataset.c, 10);
+    cell.innerHTML = '';
+    const type = getCellClass(r, c);
+    if (type === 'tw') cell.textContent = 'MT';
+    else if (type === 'dw') cell.textContent = 'MD';
+    else if (type === 'tl') cell.textContent = 'LT';
+    else if (type === 'dl') cell.textContent = 'LD';
+}
+
 function createTileElement(letter, locked, fromRack = false) {
     const div = document.createElement('div');
     div.className = 'tile';
@@ -625,13 +659,26 @@ function placeTileOnCell(cell, tileEl) {
     const rackLetter = tileEl.dataset.rackLetter || letter;
     const isBlank = tileEl.dataset.isBlank === '1';
 
+    const fromCell = tileEl.closest('.cell');
+    if (fromCell) {
+        const fromR = parseInt(fromCell.dataset.r, 10);
+        const fromC = parseInt(fromCell.dataset.c, 10);
+        if (!Number.isNaN(fromR) && !Number.isNaN(fromC)) {
+            removePlacementAt(fromR, fromC);
+        }
+        restoreCellLabel(fromCell);
+    }
+
     temporaryPlacements.push({ r, c, letter, is_blank: isBlank, rack_letter: rackLetter });
-    tileEl.parentNode.removeChild(tileEl);
+    if (!fromCell && tileEl.parentNode) {
+        tileEl.parentNode.removeChild(tileEl);
+    }
     cell.innerHTML = '';
     cell.appendChild(tileEl);
     clearSelectedTile();
     playSound('place');
     updatePreviewScore();
+    scheduleSavePlacements();
 }
 
 function returnTileToRack(r, c) {
@@ -641,6 +688,7 @@ function returnTileToRack(r, c) {
     temporaryPlacements.splice(idx, 1);
     renderRack();
     updatePreviewScore();
+    scheduleSavePlacements();
 
     const cell = document.querySelector(`.cell[data-r='${r}'][data-c='${c}']`);
     if (!cell) return;
@@ -654,6 +702,7 @@ function returnTileToRack(r, c) {
 
 function recallTiles() {
     temporaryPlacements = [];
+    suppressSavedPlacementsUntil = Date.now() + 2000;
     const cells = document.querySelectorAll('.cell');
     cells.forEach(cell => {
         if (cell.querySelector('.tile:not(.locked)')) {
@@ -670,6 +719,7 @@ function recallTiles() {
     clearSelectedTile();
     renderRack();
     updatePreviewScore();
+    scheduleSavePlacements();
 }
 
 async function submitMove() {
