@@ -15,6 +15,7 @@
             <div>
                 <h2>Bienvenue, <span id="user-display">...</span></h2>
                 <p class="muted">Prêt pour une partie élégante et rapide ?</p>
+                <p class="helper">Choisissez un joueur en ligne ou lancez une partie solo. Tout se met à jour automatiquement.</p>
             </div>
             <div class="dashboard-actions">
                 <button id="btn-solo-game" class="btn-primary">Jouer Solo</button>
@@ -27,31 +28,37 @@
         <div class="dashboard-grid">
             <div class="glass-card">
                 <h3>Mes Parties</h3>
+                <p class="helper">Reprenez une partie en cours ou revivez une partie terminée.</p>
                 <div id="games-list">Chargement...</div>
             </div>
 
             <div class="glass-card">
                 <h3>Joueurs en ligne</h3>
+                <p class="helper">Invitez un joueur disponible pour démarrer une partie.</p>
                 <div id="users-list">Chargement...</div>
             </div>
 
             <div class="glass-card">
                 <h3>Invitations</h3>
+                <p class="helper">Acceptez ou refusez rapidement pour garder le rythme.</p>
                 <div id="invites-list">Chargement...</div>
             </div>
 
             <div class="glass-card">
                 <h3>Stats</h3>
+                <p class="helper">Vos statistiques se mettent à jour après chaque partie.</p>
                 <div id="stats">Chargement...</div>
             </div>
 
             <div class="glass-card">
                 <h3>Classement</h3>
+                <p class="helper">Top des victoires. Jouez pour grimper dans le tableau.</p>
                 <div id="leaderboard">Chargement...</div>
             </div>
 
             <div class="glass-card is-hidden" id="password-card">
                 <h3>Changer le mot de passe</h3>
+                <p class="helper">Choisissez un mot de passe unique et d’au moins 8 caractères.</p>
                 <form id="change-password-form">
                     <input type="password" id="current-password" placeholder="Mot de passe actuel" required minlength="8" autocomplete="current-password">
                     <input type="password" id="new-password" placeholder="Nouveau mot de passe" required minlength="8" autocomplete="new-password">
@@ -64,6 +71,7 @@
 
     <div id="solo-game-modal" class="glass-card modal" style="display:none;">
         <h3>Nouvelle partie solo</h3>
+        <p class="helper">Mode libre : pas de limite de temps. Mode chronométré : temps par joueur.</p>
         <label>Mode de jeu:</label>
         <select id="solo-game-mode">
             <option value="free">Libre (Sans limite)</option>
@@ -85,6 +93,7 @@
 
     <div id="invite-modal" class="glass-card modal" style="display:none;">
         <h3>Inviter <span id="invite-target-name"></span></h3>
+        <p class="helper">Choisissez un mode et un temps pour équilibrer la partie.</p>
         <label>Mode de jeu:</label>
         <select id="game-mode">
             <option value="free">Libre (Sans limite)</option>

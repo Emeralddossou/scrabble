@@ -61,7 +61,7 @@ async function api(endpoint, method = 'GET', body = null, options = {}) {
             data = text ? JSON.parse(text) : {};
         } catch (e) {
             console.error('API invalid JSON:', text);
-            return { error: 'Réponse serveur invalide', status: res.status };
+            return { error: 'Réponse serveur invalide. Réessayez dans un instant.', status: res.status };
         }
 
         if (data && data.error && /csrf/i.test(data.error)) {
@@ -85,7 +85,7 @@ async function api(endpoint, method = 'GET', body = null, options = {}) {
         return data;
     } catch (e) {
         console.error('API Error:', e);
-        return { error: 'Connexion impossible', status: 0 };
+        return { error: 'Connexion impossible. Vérifiez votre réseau.', status: 0 };
     }
 }
 
@@ -222,7 +222,7 @@ if (loginForm) {
             setCsrf(res.csrf);
             window.location.href = 'dashboard.php';
         } else {
-            uiAlert(res.error || 'Connexion impossible');
+            uiAlert(res.error || 'Connexion impossible. Vérifiez vos identifiants.');
         }
     });
 }
@@ -247,7 +247,7 @@ if (registerForm) {
         const res = await api('auth.php?action=register', 'POST', { username, password });
         if (res.success) {
             setAuthMode('login');
-            uiAlert('Compte créé. Vous pouvez vous connecter.');
+            uiAlert('Compte créé. Vous pouvez maintenant vous connecter.');
         } else {
             uiAlert(res.error || "Impossible de créer le compte");
         }
@@ -342,10 +342,11 @@ async function fetchDashboardData() {
             div.style.cssText = 'padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; gap: 8px;';
             const isFinished = g.status === 'finished';
             const opponent = g.player1 === currentUser.username ? g.player2 : g.player1;
+            const statusText = g.status === 'finished' ? 'Terminée' : (g.status === 'active' ? 'En cours' : (g.status || 'En cours'));
             div.innerHTML = `
                 <div>
                     <strong>vs ${opponent}</strong>
-                    <br><span style="font-size: 0.8em; opacity: 0.7;">${g.status} | ${isFinished ? 'Terminé' : (g.current_player_id == currentUser.id ? 'À vous' : 'Adversaire')}</span>
+                    <br><span style="font-size: 0.8em; opacity: 0.7;">${statusText} • ${isFinished ? 'Terminée' : (g.current_player_id == currentUser.id ? 'À vous' : 'Adversaire')}</span>
                 </div>
                 <div style="display:flex; gap:6px;">
                     ${isFinished ? `<button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="window.location.href='replay.php?id=${g.id}'">Replay</button>` : `<button style="width: auto; padding: 5px 10px; font-size: 0.8em;" onclick="window.location.href='game.php?id=${g.id}'">Jouer</button>`}
@@ -354,7 +355,7 @@ async function fetchDashboardData() {
             gamesList.appendChild(div);
         });
     } else {
-        gamesList.innerHTML = '<p>Aucune partie en cours.</p>';
+        gamesList.innerHTML = '<p>Aucune partie pour le moment. Lancez une partie solo ou invitez un joueur.</p>';
     }
 
     const usersRes = await api('auth.php?action=users');
@@ -377,7 +378,7 @@ async function fetchDashboardData() {
             usersList.appendChild(div);
         });
     } else {
-        usersList.innerHTML = '<p>Aucun joueur en ligne.</p>';
+        usersList.innerHTML = '<p>Aucun joueur en ligne pour l’instant.</p>';
     }
 
     await fetchInvites();
@@ -398,7 +399,7 @@ async function fetchInvites() {
         res.invites.forEach(inv => {
             const div = document.createElement('div');
             div.style.cssText = 'padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; gap: 8px;';
-            const modeLabel = inv.mode === 'timer' ? `Chrono ${inv.time_limit}m +${inv.increment}s` : 'Libre';
+            const modeLabel = inv.mode === 'timer' ? `Chrono ${inv.time_limit} min +${inv.increment} s` : 'Libre';
             div.innerHTML = `
                 <div>
                     <strong>${inv.from_username}</strong>
@@ -412,7 +413,7 @@ async function fetchInvites() {
             invitesList.appendChild(div);
         });
     } else {
-        invitesList.innerHTML = '<p>Aucune invitation.</p>';
+        invitesList.innerHTML = '<p>Aucune invitation. Invitez un joueur en ligne.</p>';
     }
 }
 
@@ -442,10 +443,10 @@ async function fetchStats() {
     } else if (res.success) {
         const s = res.stats || {};
         statsEl.innerHTML = `
-            <div>Parties: <strong>${s.total || 0}</strong></div>
-            <div>Victoires: <strong>${s.wins || 0}</strong></div>
-            <div>Défaites: <strong>${s.losses || 0}</strong></div>
-            <div>Nuls: <strong>${s.draws || 0}</strong></div>
+            <div>Parties : <strong>${s.total || 0}</strong></div>
+            <div>Victoires : <strong>${s.wins || 0}</strong></div>
+            <div>Défaites : <strong>${s.losses || 0}</strong></div>
+            <div>Nuls : <strong>${s.draws || 0}</strong></div>
         `;
     }
 }
@@ -459,7 +460,7 @@ async function fetchLeaderboard() {
     } else if (res.success) {
         const leaders = res.leaders || [];
         if (leaders.length === 0) {
-            boardEl.innerHTML = '<p>Aucun classement.</p>';
+            boardEl.innerHTML = '<p>Le classement apparaîtra après vos premières parties.</p>';
             return;
         }
         boardEl.innerHTML = leaders.map((l, idx) => (
@@ -587,7 +588,7 @@ async function sendInvite() {
         closeModal();
         fetchDashboardData();
     } else {
-        uiAlert('Erreur: ' + (res.error || 'Impossible d\'envoyer l\'invitation'));
+        uiAlert('Erreur : ' + (res.error || 'Impossible d’envoyer l’invitation'));
     }
 }
 
@@ -618,6 +619,6 @@ async function createSoloGame() {
         closeSoloModal();
         window.location.href = `game.php?id=${res.game_id}`;
     } else {
-        uiAlert('Erreur: ' + (res.error || 'Impossible de créer la partie solo'));
+        uiAlert('Erreur : ' + (res.error || 'Impossible de créer la partie solo'));
     }
 }

@@ -21,6 +21,7 @@
             </div>
 
             <p class="muted center">Connectez-vous pour entrer dans l’arène.</p>
+            <p class="helper center">Nouveau joueur ? Créez un compte en moins d’une minute.</p>
 
             <div class="auth-toggle">
                 <button id="toggle-login" class="active" type="button">Connexion</button>
@@ -28,15 +29,17 @@
             </div>
 
             <form id="login-form">
-                <input type="text" id="login-username" placeholder="Nom d'utilisateur" required maxlength="20" autocomplete="username">
-                <input type="password" id="login-password" placeholder="Mot de passe" required minlength="8" autocomplete="current-password">
+                <input type="text" id="login-username" placeholder="Nom d'utilisateur" aria-label="Nom d'utilisateur" required maxlength="20" autocomplete="username">
+                <input type="password" id="login-password" placeholder="Mot de passe" aria-label="Mot de passe" required minlength="8" autocomplete="current-password">
+                <p class="helper">Astuce : votre mot de passe fait au moins 8 caractères.</p>
                 <button type="submit">Se connecter</button>
             </form>
 
             <form id="register-form" style="display:none;">
-                <input type="text" id="register-username" placeholder="Nom d'utilisateur" required maxlength="20" autocomplete="username">
-                <input type="password" id="register-password" placeholder="Mot de passe (min 8)" required minlength="8" autocomplete="new-password">
-                <input type="password" id="register-password-confirm" placeholder="Confirmer le mot de passe" required minlength="8" autocomplete="new-password">
+                <input type="text" id="register-username" placeholder="Nom d'utilisateur" aria-label="Nom d'utilisateur" required maxlength="20" autocomplete="username">
+                <input type="password" id="register-password" placeholder="Mot de passe (min 8)" aria-label="Mot de passe" required minlength="8" autocomplete="new-password">
+                <input type="password" id="register-password-confirm" placeholder="Confirmer le mot de passe" aria-label="Confirmer le mot de passe" required minlength="8" autocomplete="new-password">
+                <p class="helper">Conseil : choisissez un mot de passe unique et mémorisable.</p>
                 <button type="submit">Créer le compte</button>
             </form>
 
@@ -45,9 +48,10 @@
             </div>
 
             <form id="reset-form" style="display:none;">
-                <input type="text" id="reset-username" placeholder="Nom d'utilisateur" required maxlength="20" autocomplete="username">
-                <input type="text" id="reset-token" placeholder="Code de réinitialisation" required>
-                <input type="password" id="reset-password" placeholder="Nouveau mot de passe (min 8)" required minlength="8" autocomplete="new-password">
+                <p class="helper">Entrez votre nom, demandez un code, puis choisissez un nouveau mot de passe.</p>
+                <input type="text" id="reset-username" placeholder="Nom d'utilisateur" aria-label="Nom d'utilisateur" required maxlength="20" autocomplete="username">
+                <input type="text" id="reset-token" placeholder="Code de réinitialisation" aria-label="Code de réinitialisation" required>
+                <input type="password" id="reset-password" placeholder="Nouveau mot de passe (min 8)" aria-label="Nouveau mot de passe" required minlength="8" autocomplete="new-password">
                 <button type="button" id="request-reset">Demander un code</button>
                 <button type="submit">Réinitialiser</button>
             </form>

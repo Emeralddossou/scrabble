@@ -83,12 +83,12 @@ function initBoardZoom() {
     const root = document.body;
     const saved = localStorage.getItem('board_zoomed') === '1';
     if (saved) root.classList.add('board-zoomed');
-    btn.textContent = saved ? 'Zoom: ON' : 'Zoom plateau';
+    btn.textContent = saved ? 'Zoom : activé' : 'Zoom plateau';
     btn.addEventListener('click', () => {
         root.classList.toggle('board-zoomed');
         const on = root.classList.contains('board-zoomed');
         localStorage.setItem('board_zoomed', on ? '1' : '0');
-        btn.textContent = on ? 'Zoom: ON' : 'Zoom plateau';
+        btn.textContent = on ? 'Zoom : activé' : 'Zoom plateau';
         uiToast(on ? 'Zoom activé' : 'Zoom désactivé', 'info', 900);
     });
 }
@@ -171,11 +171,11 @@ let audioCtx = null;
 function initSoundToggle() {
     const btn = document.getElementById('sound-toggle');
     if (!btn) return;
-    btn.textContent = soundEnabled ? 'Son: ON' : 'Son: OFF';
+    btn.textContent = soundEnabled ? 'Son : activé' : 'Son : coupé';
     btn.addEventListener('click', () => {
         soundEnabled = !soundEnabled;
         localStorage.setItem('sound_enabled', soundEnabled ? '1' : '0');
-        btn.textContent = soundEnabled ? 'Son: ON' : 'Son: OFF';
+        btn.textContent = soundEnabled ? 'Son : activé' : 'Son : coupé';
         if (soundEnabled) playSound('toggle');
     });
 }
@@ -377,14 +377,14 @@ async function fetchGameState() {
     isMyTurn = gameState.current_player_id == me;
     if (gameState.status === 'finished') {
         const winner = players.find(p => p.user_id == gameState.winner_id);
-        document.getElementById('game-status').textContent = winner ? `Terminé - Victoire de ${winner.username}` : 'Terminé - Match nul';
+        document.getElementById('game-status').textContent = winner ? `Partie terminée — victoire de ${winner.username}` : 'Partie terminée — match nul';
         document.getElementById('game-status').style.color = '#fbbf24';
         const badge = document.getElementById('turn-badge');
         if (badge) badge.style.display = 'none';
         disableActions();
         if (exchangeMode) cancelExchangeMode();
     } else {
-        document.getElementById('game-status').textContent = isMyTurn ? "C'est à votre tour !" : 'Adversaire...';
+        document.getElementById('game-status').textContent = isMyTurn ? 'À vous de jouer' : 'Tour de l’adversaire';
         document.getElementById('game-status').style.color = isMyTurn ? '#4ade80' : '#f87171';
         const badge = document.getElementById('turn-badge');
         if (badge) badge.style.display = isMyTurn ? 'none' : 'inline-flex';
@@ -673,7 +673,10 @@ function recallTiles() {
 }
 
 async function submitMove() {
-    if (temporaryPlacements.length === 0) return;
+    if (temporaryPlacements.length === 0) {
+        uiToast('Placez au moins une lettre sur le plateau.', 'info', 1200);
+        return;
+    }
     if (exchangeMode) return;
     if (!isMyTurn) {
         uiAlert("Ce n'est pas votre tour.");
@@ -707,7 +710,7 @@ function shuffleRack() {
 
 async function passTurn() {
     if (exchangeMode) return;
-    if (await uiConfirm('Passer votre tour ?')) {
+    if (await uiConfirm('Passer votre tour ? Vos lettres restent identiques.')) {
         const res = await api('game.php?action=pass', 'POST', { game_id: gameId });
         if (res && res.success) {
             playSound('pass');
@@ -719,7 +722,7 @@ async function passTurn() {
 }
 
 async function resignGame() {
-    if (await uiConfirm('Abandonner la partie ?')) {
+    if (await uiConfirm('Abandonner la partie ? Cela mettra fin au match.')) {
         const res = await api('game.php?action=resign', 'POST', { game_id: gameId });
         if (res && res.success) {
             playSound('resign');
@@ -745,8 +748,9 @@ function toggleExchangeMode() {
     exchangeMode = true;
     exchangeSelections = new Set();
     document.getElementById('exchange-banner').style.display = 'block';
-    document.getElementById('btn-exchange').textContent = 'Confirmer échange';
+    document.getElementById('btn-exchange').textContent = 'Confirmer l’échange';
     document.getElementById('btn-cancel-exchange').style.display = 'inline-block';
+    uiToast('Mode échange activé', 'info', 900);
 }
 
 function cancelExchangeMode() {
@@ -858,12 +862,12 @@ function updatePreviewScore() {
     if (!scoreEl || !noteEl) return;
     if (!lastBoard) {
         scoreEl.textContent = '0';
-        noteEl.textContent = '';
+        noteEl.textContent = 'Placez des lettres pour voir une estimation.';
         return;
     }
     if (temporaryPlacements.length === 0) {
         scoreEl.textContent = '0';
-        noteEl.textContent = '';
+        noteEl.textContent = 'Placez des lettres pour voir une estimation.';
         return;
     }
     const res = computeScorePreview(lastBoard, temporaryPlacements);
@@ -872,7 +876,7 @@ function updatePreviewScore() {
         noteEl.textContent = res.error;
     } else {
         scoreEl.textContent = res.score;
-        noteEl.textContent = '';
+        noteEl.textContent = 'Estimation avant validation.';
     }
 }
 
@@ -887,7 +891,7 @@ function computeScorePreview(board, placements) {
     const cols = [...new Set(moves.map(m => m.c))];
     const isHorizontal = rows.length === 1;
     const isVertical = cols.length === 1;
-    if (!isHorizontal && !isVertical) return { valid: false, error: 'Non aligné' };
+    if (!isHorizontal && !isVertical) return { valid: false, error: 'Les lettres doivent être alignées.' };
 
     const sorted = [...moves].sort((a, b) => isHorizontal ? a.c - b.c : a.r - b.r);
     const start = isHorizontal ? sorted[0].c : sorted[0].r;
@@ -899,15 +903,15 @@ function computeScorePreview(board, placements) {
         const c = isHorizontal ? i : fixed;
         const isPlaced = moves.some(m => m.r === r && m.c === c);
         if (!isPlaced && !board[r][c]) {
-            return { valid: false, error: 'Pas de continuité' };
+            return { valid: false, error: 'Les lettres doivent se suivre sans trou.' };
         }
     }
 
     const isFirstMove = isBoardEmpty(board);
     if (isFirstMove) {
         const touchesCenter = moves.some(m => m.r === 7 && m.c === 7);
-        if (!touchesCenter) return { valid: false, error: 'Doit passer par le centre' };
-        if (moves.length < 2) return { valid: false, error: 'Au moins 2 lettres' };
+        if (!touchesCenter) return { valid: false, error: 'Le premier mot doit passer par le centre.' };
+        if (moves.length < 2) return { valid: false, error: 'Le premier mot doit contenir au moins 2 lettres.' };
     } else {
         let touchesExisting = false;
         moves.forEach(m => {
@@ -921,7 +925,7 @@ function computeScorePreview(board, placements) {
                 }
             });
         });
-        if (!touchesExisting) return { valid: false, error: 'Doit toucher un mot' };
+        if (!touchesExisting) return { valid: false, error: 'Le mot doit toucher une lettre déjà posée.' };
     }
 
     const temp = board.map(row => row.slice());

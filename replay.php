@@ -15,6 +15,7 @@
             <div>
                 <h2>Replay Partie #<span id="game-id-display"></span></h2>
                 <p class="muted">Revivez les coups clés, un par un.</p>
+                <p class="helper">Utilisez les contrôles pour avancer, reculer ou lancer la lecture automatique.</p>
             </div>
             <button class="btn-ghost" onclick="window.location.href='dashboard.php'">Retour</button>
         </div>
@@ -24,10 +25,11 @@
 
             <div class="glass-card replay-controls">
                 <h3>Contrôles</h3>
+                <p class="helper">Astuce : la lecture auto s’arrête quand vous changez de sens.</p>
                 <div class="replay-actions">
                     <button onclick="prevMove()">Précédent</button>
                     <button onclick="nextMove()">Suivant</button>
-                    <button onclick="autoPlay()">Auto</button>
+                    <button id="btn-auto" onclick="autoPlay()">Auto</button>
                 </div>
                 <div id="move-info">
                     Tour: <span id="current-move">0</span> / <span id="total-moves">0</span>
@@ -107,8 +109,12 @@
             }
         }
 
-        function nextMove() {
-            if (currentStep >= moves.length) return;
+        function nextMove(fromAuto = false) {
+            if (!fromAuto) stopAutoPlay();
+            if (currentStep >= moves.length) {
+                if (fromAuto) stopAutoPlay();
+                return;
+            }
             const move = moves[currentStep];
             const coords = JSON.parse(move.coordinates);
             coords.forEach(m => {
@@ -130,6 +136,7 @@
         }
 
         function prevMove() {
+            stopAutoPlay();
             if (currentStep <= 0) return;
             currentStep--;
             initBoard();
@@ -151,12 +158,25 @@
         }
 
         let autoInterval;
+        function setAutoButton(active) {
+            const btn = document.getElementById('btn-auto');
+            if (btn) btn.textContent = active ? 'Pause' : 'Auto';
+        }
+
+        function stopAutoPlay() {
+            if (!autoInterval) return;
+            clearInterval(autoInterval);
+            autoInterval = null;
+            setAutoButton(false);
+        }
+
         function autoPlay() {
             if (autoInterval) {
-                clearInterval(autoInterval);
-                autoInterval = null;
+                stopAutoPlay();
             } else {
-                autoInterval = setInterval(nextMove, 1000);
+                if (!moves.length) return;
+                setAutoButton(true);
+                autoInterval = setInterval(() => nextMove(true), 1000);
             }
         }
     </script>

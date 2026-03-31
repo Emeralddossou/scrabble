@@ -24,21 +24,27 @@
                         <div id="turn-badge" class="turn-badge" style="display:none;">Hors tour</div>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <button id="mobile-history-toggle" class="mobile-history-toggle" type="button">Historique</button>
-                        <button id="board-zoom-toggle" class="sound-toggle" type="button">Zoom plateau</button>
-                        <button id="sound-toggle" class="sound-toggle" type="button">Son: ON</button>
-                        <button class="btn-ghost" onclick="window.location.href='dashboard.php'">Quitter</button>
+                        <button id="mobile-history-toggle" class="mobile-history-toggle" type="button" title="Ouvrir l’historique des coups">Historique</button>
+                        <button id="board-zoom-toggle" class="sound-toggle" type="button" title="Agrandir ou réduire le plateau">Zoom plateau</button>
+                        <button id="sound-toggle" class="sound-toggle" type="button" title="Activer ou couper les sons">Son : activé</button>
+                        <button class="btn-ghost" onclick="window.location.href='dashboard.php'" title="Retour au tableau de bord">Quitter</button>
                     </div>
+                </div>
+
+                <div class="game-hints">
+                    <p><strong>Astuce :</strong> glissez-déposez les lettres ou touchez une lettre puis une case.</p>
+                    <p class="muted">Rappeler annule vos placements, Mélanger réorganise votre chevalet.</p>
                 </div>
 
                 <div id="game-container">
                     <div id="board"></div>
                 </div>
 
+                <div class="rack-label muted">Votre chevalet</div>
                 <div id="rack" class="glass-card"></div>
 
                 <div id="exchange-banner" class="exchange-banner" style="display:none;">
-                    Sélectionnez des lettres à échanger, puis confirmez.
+                    Sélectionnez les lettres à échanger, puis cliquez sur « Confirmer échange ».
                 </div>
 
                 <div class="game-actions">
@@ -62,10 +68,18 @@
                     Pièces restantes: <span id="bag-count">--</span>
                 </div>
 
+                <div class="mini-legend">
+                    <strong>Légende</strong>
+                    <div>MT = Mot triple</div>
+                    <div>MD = Mot double</div>
+                    <div>LT = Lettre triple</div>
+                    <div>LD = Lettre double</div>
+                </div>
+
                 <div class="score-preview">
                     <div class="muted">Score potentiel</div>
                     <div id="preview-score">0</div>
-                    <div id="preview-note" class="muted" style="font-size:0.85rem;"></div>
+                    <div id="preview-note" class="muted" style="font-size:0.85rem;">Estimation avant validation.</div>
                 </div>
             </div>
         </div>
