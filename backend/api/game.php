@@ -1,11 +1,11 @@
 ﻿<?php
-// backend/api/game.php
+// backend/api/game.php - Game API endpoints
 
-require_once '../bootstrap.php';
-require_once '../db.php';
-require_once '../GameLogic.php';
-require_once '../Logger.php';
-require_once '../env.php';
+require_once dirname(__DIR__) . '/bootstrap.php';
+require_once dirname(__DIR__) . '/db.php';
+require_once dirname(__DIR__) . '/GameLogic.php';
+require_once dirname(__DIR__) . '/Logger.php';
+require_once dirname(__DIR__) . '/env.php';
 
 header('Content-Type: application/json; charset=utf-8');
 

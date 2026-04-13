@@ -1,8 +1,7 @@
 <?php
 // tests/IntegrationTest.php
 
-require_once __DIR__ . '/../backend/db.php';
-require_once __DIR__ . '/../backend/api/auth.php';
+require_once __DIR__ . '/../backend/bootstrap.php';
 require_once __DIR__ . '/../backend/GameLogic.php';
 
 use PHPUnit\Framework\TestCase;

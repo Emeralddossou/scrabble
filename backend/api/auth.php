@@ -1,8 +1,7 @@
 ﻿<?php
-// backend/api/auth.php
+// backend/api/auth.php - Authentication endpoints
 
-require_once '../bootstrap.php';
-require_once '../db.php';
+require_once dirname(__DIR__) . '/bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 

@@ -1,7 +1,9 @@
 <?php
-// backend/bootstrap.php
+// backend/bootstrap.php - App initialization & security
 
 require_once __DIR__ . '/env.php';
+require_once __DIR__ . '/Logger.php';
+require_once __DIR__ . '/utils.php';
 
 // Setup error logging first
 error_reporting(E_ALL);

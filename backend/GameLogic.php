@@ -1,5 +1,7 @@
 <?php
-// backend/GameLogic.php
+// backend/GameLogic.php - Game logic and validation
+
+require_once __DIR__ . '/db.php';
 
 class GameLogic {
     private $pdo;

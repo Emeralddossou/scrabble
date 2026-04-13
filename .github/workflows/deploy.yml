@@ -66,6 +66,20 @@ jobs:
           mysql -uroot -e "GRANT ALL PRIVILEGES ON scrabble_test.* TO 'scrabble_test'@localhost;"
           mysql -uroot -e "FLUSH PRIVILEGES;"
       
+      - name: Create .env for Tests
+        run: |
+          cat > .env << EOF
+          DB_TYPE=mysql
+          DB_HOST=localhost
+          DB_PORT=3306
+          DB_USER=scrabble_test
+          DB_PASS=test_password
+          DB_NAME=scrabble_test
+          DB_ALLOW_FALLBACK=false
+          APP_ENV=testing
+          APP_DEBUG=true
+          EOF
+      
       - name: Install PHPUnit
         run: |
           composer require --dev phpunit/phpunit --no-interaction || wget https://phar.phpunit.de/phpunit-9.phar
@@ -73,6 +87,7 @@ jobs:
       
       - name: Run Unit Tests
         run: |
+          cd /home/runner/work/scrabble/scrabble
           if [ -f vendor/bin/phpunit ]; then
             vendor/bin/phpunit tests/
           elif [ -f phpunit-9.phar ]; then
