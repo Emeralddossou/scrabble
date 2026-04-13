@@ -40,10 +40,10 @@ function recordLoginAttempt($pdo, $userId, $ipAddress, $success) {
         
         if ($attemptCount >= 5) {
             $lockedUntil = date('Y-m-d H:i:s', strtotime('+30 minutes'));
-            $stmt = $pdo->prepare("INSERT INTO login_attempts (user_id, ip_address, attempt_count, locked_until) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET attempt_count = ?, locked_until = ?");
+            $stmt = $pdo->prepare("INSERT INTO login_attempts (user_id, ip_address, attempt_count, locked_until) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE attempt_count = ?, locked_until = ?");
             $stmt->execute([$userId, $ipAddress, $attemptCount, $lockedUntil, $attemptCount, $lockedUntil]);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO login_attempts (user_id, ip_address, attempt_count) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET attempt_count = ?");
+            $stmt = $pdo->prepare("INSERT INTO login_attempts (user_id, ip_address, attempt_count) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE attempt_count = ?");
             $stmt->execute([$userId, $ipAddress, $attemptCount, $attemptCount]);
         }
     }

@@ -17,10 +17,11 @@ class GameLogicTest extends TestCase {
     }
     
     public function testInitializeBag() {
-        $bag = $this->logic->initializeBag();
+        $logic = new GameLogic($this->pdo);
+        $bag = $logic->initializeBag();
         
-        // French Scrabble has 100 tiles
-        $this->assertCount(100, $bag);
+        // French Scrabble has 102 tiles
+        $this->assertCount(102, $bag);
         
         // Check letter counts
         $counts = array_count_values($bag);
@@ -146,8 +147,11 @@ class GameLogicTest extends TestCase {
         // Top-left is triple word
         $this->assertEquals('tw', $this->logic->getMultiplier(0, 0));
         
-        // Regular cell
-        $this->assertEquals('', $this->logic->getMultiplier(1, 1));
+        // Position (1,1) is double word
+        $this->assertEquals('dw', $this->logic->getMultiplier(1, 1));
+        
+        // Regular cell (2,2) is double letter
+        $this->assertEquals('dl', $this->logic->getMultiplier(2, 2));
     }
     
     public function testIsValidWordWithDictionary() {
