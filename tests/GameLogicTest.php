@@ -150,8 +150,11 @@ class GameLogicTest extends TestCase {
         // Position (1,1) is double word
         $this->assertEquals('dw', $this->logic->getMultiplier(1, 1));
         
-        // Regular cell (2,2) is double letter
-        $this->assertEquals('dl', $this->logic->getMultiplier(2, 2));
+        // Position (2,2) is also double word
+        $this->assertEquals('dw', $this->logic->getMultiplier(2, 2));
+        
+        // Position (0,3) is double letter
+        $this->assertEquals('dl', $this->logic->getMultiplier(0, 3));
     }
     
     public function testIsValidWordWithDictionary() {
