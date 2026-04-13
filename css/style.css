@@ -161,8 +161,35 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-    outline: 2px solid #38bdf8;
+    outline: 3px solid #38bdf8;
     outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.3);
+}
+
+/* Enhanced focus for keyboard navigation */
+button:focus,
+input:focus,
+select:focus {
+    outline: 3px solid #38bdf8;
+    outline-offset: 2px;
+}
+
+/* Skip link for keyboard users */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #38bdf8;
+    color: #0f172a;
+    padding: 8px 16px;
+    z-index: 100;
+    transition: top 0.3s;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.skip-link:focus {
+    top: 0;
 }
 
 .btn-ghost {
@@ -707,10 +734,23 @@ body.modal-open {
         padding: 0.9rem;
     }
     .page-game .container {
-        padding: 10px;
+        padding: 8px;
     }
     #board {
-        width: min(92vw, 52vh);
+        width: min(95vw, 58vh);
+        max-width: 400px;
+    }
+    .cell {
+        font-size: 0.45rem;
+        min-height: 12px;
+    }
+    .tile {
+        font-size: 0.8rem;
+    }
+    .tile span.points {
+        font-size: 0.35rem;
+        bottom: 2px;
+        right: 4px;
     }
     .history-log {
         height: 110px;
@@ -738,19 +778,30 @@ body.modal-open {
     .game-main {
         padding-bottom: 110px;
     }
+    #rack .tile {
+        width: 32px;
+        height: 32px;
+    }
 }
 
 @media (max-width: 480px) {
     .container {
-        width: 94%;
-        margin: 18px auto;
+        width: 96%;
+        margin: 12px auto;
     }
     #rack .tile {
-        width: 40px;
-        height: 40px;
+        width: 28px;
+        height: 28px;
+        font-size: 0.7rem;
     }
     .cell {
-        font-size: 0.5rem;
+        font-size: 0.4rem;
+        min-height: 10px;
+    }
+    .tile span.points {
+        font-size: 0.3rem;
+        bottom: 1px;
+        right: 3px;
     }
     .dashboard-actions {
         width: 100%;
@@ -758,10 +809,17 @@ body.modal-open {
         flex-wrap: wrap;
     }
     .game-actions {
-        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 8px;
     }
     .game-header {
         gap: 6px;
+    }
+    .game-hints {
+        display: none;
+    }
+    .board-zoomed #board {
+        transform: scale(1.05);
     }
 }
 

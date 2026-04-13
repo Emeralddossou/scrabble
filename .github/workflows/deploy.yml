@@ -52,6 +52,7 @@ jobs:
         with:
           php-version: '7.4'
           extensions: pdo, mysql
+          tools: composer, phpunit
       
       - name: Setup MySQL
         uses: ankane/setup-mysql@v1
@@ -64,10 +65,25 @@ jobs:
           mysql -uroot -e "CREATE USER IF NOT EXISTS 'scrabble_test'@localhost IDENTIFIED BY 'test_password';"
           mysql -uroot -e "GRANT ALL PRIVILEGES ON scrabble_test.* TO 'scrabble_test'@localhost;"
           mysql -uroot -e "FLUSH PRIVILEGES;"
+      
+      - name: Install PHPUnit
+        run: |
+          composer require --dev phpunit/phpunit --no-interaction || wget https://phar.phpunit.de/phpunit-9.phar
+          chmod +x phpunit-9.phar || true
+      
+      - name: Run Unit Tests
+        run: |
+          if [ -f vendor/bin/phpunit ]; then
+            vendor/bin/phpunit tests/
+          elif [ -f phpunit-9.phar ]; then
+            php phpunit-9.phar tests/
+          else
+            echo "PHPUnit not found, skipping tests"
+          fi
 
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy via FTP
+    name: Deploy via SSH
     needs: [lint, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
@@ -86,32 +102,35 @@ jobs:
           DB_PASS=${{ secrets.DB_PASS }}
           DB_NAME=${{ secrets.DB_NAME }}
           DB_ALLOW_FALLBACK=false
-          FTP_HOST=${{ secrets.FTP_HOST }}
-          FTP_USER=${{ secrets.FTP_USER }}
-          FTP_PASS=${{ secrets.FTP_PASS }}
+          SSH_HOST=${{ secrets.SSH_HOST }}
+          SSH_USER=${{ secrets.SSH_USER }}
+          SSH_PORT=${{ secrets.SSH_PORT }}
           APP_ENV=production
           APP_DEBUG=false
           EOF
           cp .env env.production
       
-      - name: Setup FTP Deploy Action
-        uses: milanmk/actions-file-deployer@master
-        with:
-          remote-protocol: ftp
-          remote-host: ${{ secrets.FTP_HOST }}
-          remote-port: 21
-          remote-user: ${{ secrets.FTP_USER }}
-          remote-password: ${{ secrets.FTP_PASS }}
-          local-path: .
-          remote-path: /htdocs
-          sync: full
-          ftp-options: --ignore-time --allow-empty-file
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy via SSH
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
+            cd /var/www/html
+            git pull origin main
+            composer install --no-dev --optimize-autoloader
+            php artisan migrate --force
+          ENDSSH
       
       - name: Deploy Summary
         if: success()
         run: |
           echo "✅ Deployment successful!"
-          echo "App deployed to: ${{ secrets.FTP_HOST }}"
+          echo "App deployed to: ${{ secrets.SSH_HOST }}"
 
       - name: Notify on Failure
         if: failure()

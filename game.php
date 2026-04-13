@@ -10,18 +10,19 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="page-game">
+    <a href="#game-container" class="skip-link">Aller au plateau de jeu</a>
     <div class="container game-page">
         <div class="game-layout">
             <div class="game-main">
                 <div class="glass-card game-header">
                     <div class="game-scores">
-                        <span id="player1-name">J1</span>: <strong id="player1-score">0</strong> <span id="p1-timer" class="timer">(00:00)</span>
+                        <span id="player1-name" data-user-id="" role="button" tabindex="0" aria-label="Nom du joueur 1, cliquez pour voir le profil">J1</span>: <strong id="player1-score" aria-label="Score du joueur 1">0</strong> <span id="p1-timer" class="timer" aria-label="Temps restant du joueur 1">(00:00)</span>
                         <span class="vs">vs</span>
-                        <span id="player2-name">J2</span>: <strong id="player2-score">0</strong> <span id="p2-timer" class="timer">(00:00)</span>
+                        <span id="player2-name" data-user-id="" role="button" tabindex="0" aria-label="Nom du joueur 2, cliquez pour voir le profil">J2</span>: <strong id="player2-score" aria-label="Score du joueur 2">0</strong> <span id="p2-timer" class="timer" aria-label="Temps restant du joueur 2">(00:00)</span>
                     </div>
                     <div>
-                        <div id="game-status" aria-live="polite">En attente...</div>
-                        <div id="turn-badge" class="turn-badge" style="display:none;">Hors tour</div>
+                        <div id="game-status" role="status" aria-live="polite">En attente...</div>
+                        <div id="turn-badge" class="turn-badge" style="display:none;" aria-live="polite">Hors tour</div>
                     </div>
                     <div style="display:flex; gap:8px;">
                         <button id="mobile-history-toggle" class="mobile-history-toggle" type="button" title="Ouvrir l’historique des coups">Historique</button>
@@ -34,7 +35,7 @@
                 <div class="game-hints">
                     <p><strong>Astuce :</strong> glissez-déposez les lettres ou touchez une lettre puis une case.</p>
                     <p class="muted">Rappeler annule vos placements, Mélanger réorganise votre chevalet.</p>
-                    <p style="color:red"><strong>En cas d'erreur ou de bug, actualisez la page et priez. Si le problème n'est pas résolu, sachez qu'on aura fait de notre mieux. Merci !</strong></p>
+                    <p style="color:red"><strong>En cas d'erreur technique, actualisez la page. Si le problème persiste, contactez le support technique.</strong></p>
                 </div>
 
                 <div id="game-container">

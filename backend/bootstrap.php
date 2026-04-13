@@ -47,9 +47,10 @@ if (is_production() && !$isSecure) {
 session_set_cookie_params([
     'httponly' => true,
     'samesite' => 'Lax',
-    'secure' => $isSecure
+    'secure' => $isSecure,
+    'lifetime' => 7200 // 2 hours
 ]);
-ini_set('session.gc_maxlifetime', '604800'); // 7 days
+ini_set('session.gc_maxlifetime', '7200'); // 2 hours (was 7 days)
 
 session_start();
 request_id();

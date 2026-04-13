@@ -10,7 +10,8 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="page-dashboard">
-    <div class="container">
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+    <div class="container" id="main-content">
         <header class="dashboard-header">
             <div>
                 <h2>Bienvenue, <span id="user-display">...</span></h2>
@@ -27,42 +28,42 @@
 
         <div class="dashboard-grid">
             <div class="glass-card">
-                <h3>Mes Parties</h3>
-                <p class="helper">Reprenez une partie en cours ou revivez une partie terminée.</p>
-                <div id="games-list">Chargement...</div>
+                <h3>Parties en cours</h3>
+                <p class="helper">Vos parties actives. Rejoignez ou créez-en une nouvelle.</p>
+                <div id="games-list" aria-live="polite" aria-busy="true">Chargement...</div>
             </div>
 
             <div class="glass-card">
                 <h3>Joueurs en ligne</h3>
-                <p class="helper">Invitez un joueur disponible pour démarrer une partie.</p>
-                <div id="users-list">Chargement...</div>
+                <p class="helper">Qui est disponible pour une partie ?</p>
+                <div id="online-users" aria-live="polite" aria-busy="true">Chargement...</div>
             </div>
 
             <div class="glass-card">
                 <h3>Invitations</h3>
-                <p class="helper">Acceptez ou refusez rapidement pour garder le rythme.</p>
-                <div id="invites-list">Chargement...</div>
+                <p class="helper">Les invitations que vous avez reçues.</p>
+                <div id="invitations-list" aria-live="polite" aria-busy="true">Chargement...</div>
             </div>
 
             <div class="glass-card">
-                <h3>Stats</h3>
-                <p class="helper">Vos statistiques se mettent à jour après chaque partie.</p>
-                <div id="stats">Chargement...</div>
+                <h3>Vos statistiques</h3>
+                <p class="helper">Victoires, défaites, parties jouées.</p>
+                <div id="stats" aria-live="polite">Chargement...</div>
             </div>
 
             <div class="glass-card">
                 <h3>Classement</h3>
                 <p class="helper">Top des victoires. Jouez pour grimper dans le tableau.</p>
-                <div id="leaderboard">Chargement...</div>
+                <div id="leaderboard" aria-live="polite">Chargement...</div>
             </div>
 
             <div class="glass-card is-hidden" id="password-card">
                 <h3>Changer le mot de passe</h3>
-                <p class="helper">Choisissez un mot de passe unique et d’au moins 8 caractères.</p>
+                <p class="helper">Choisissez un mot de passe unique de 10+ caractères avec majuscule, minuscule, chiffre et caractère spécial.</p>
                 <form id="change-password-form">
-                    <input type="password" id="current-password" placeholder="Mot de passe actuel" required minlength="8" autocomplete="current-password">
-                    <input type="password" id="new-password" placeholder="Nouveau mot de passe" required minlength="8" autocomplete="new-password">
-                    <input type="password" id="new-password-confirm" placeholder="Confirmer le nouveau mot de passe" required minlength="8" autocomplete="new-password">
+                    <input type="password" id="current-password" placeholder="Mot de passe actuel" required minlength="10" autocomplete="current-password">
+                    <input type="password" id="new-password" placeholder="Nouveau mot de passe" required minlength="10" autocomplete="new-password">
+                    <input type="password" id="new-password-confirm" placeholder="Confirmer le nouveau mot de passe" required minlength="10" autocomplete="new-password">
                     <button type="submit">Mettre à jour</button>
                 </form>
             </div>

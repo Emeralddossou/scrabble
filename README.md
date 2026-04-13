@@ -1,32 +1,69 @@
 # Scrabble Français - Jeu Multiplayer en Ligne
 
-Un jeu de Scrabble français moderne, en ligne, avec support du temps réel and du mode solo pour l'entraînement.
+Un jeu de Scrabble français moderne, en ligne, avec support du temps réel et du mode solo pour l'entraînement.
 
 ## Fonctionnalités
 
+### Gameplay
 - 🎮 **Jeu Multiplayer** - Jouez contre d'autres joueurs en temps réel
 - ⏱️ **Mode Chronométré** - Parties avec time management
-- 🎯 **Mode Solo** - Entraînez-vous seul
+- 🎯 **Mode Solo** - Entraînez-vous seul avec IA basique
 - 📊 **Scoring Automatique** - Calcul complet des points selon les règles du Scrabble français
-- 🛡️ **Sécurisé** - Authentification utilisateur, validation serveur
-- 📱 **Responsive** - Design moderne et adaptatif
+- � **Suggestions de mots** - Système de suggestions basé sur votre chevalet
+- 🔄 **Replay** - Rejouez les parties terminées
+
+### Sécurité
+- �️ **Politique de mot de passe renforcée** - 10+ caractères avec complexité
+- 🔒 **Verrouillage de compte** - Protection après 5 tentatives échouées
+- ⏰ **Session timeout sécurisé** - Sessions expirent après 2 heures
+- 🛡️ **Protection CSRF** - Validation sur tous les endpoints sensibles
+- 🚦 **Rate limiting** - Protection contre les attaques par force brute
+- 🔐 **HTTPS enforcement** - HTTPS requis en production
+
+### Accessibilité
+- ♿ **ARIA labels** - Labels pour les lecteurs d'écran
+- ⌨️ **Navigation au clavier** - Skip links et focus visibles
+- 🎯 **Contraste amélioré** - Respect des normes WCAG
+- 📢 **Live regions** - Mises à jour dynamiques annoncées
+
+### Performance
+- ⚡ **Cache dictionnaire** - Chargement optimisé avec APCu
+- 📊 **Monitoring intégré** - Métriques de performance et erreurs
+- 🔄 **Log rotation** - Logs automatiques (30 jours)
+- 📱 **Responsive mobile** - Optimisé pour petits écrans
+
+### Tests
+- ✅ **Tests unitaires** - PHPUnit pour la logique de jeu
+- 🔍 **Tests d'intégration** - Flux complets testés
+- 🔒 **Validation sécurité** - Tests de sécurité intégrés
 
 ## Architecture
 
 ```
 frontend/
-  ├── css/style.css           - Styling global
+  ├── css/style.css           - Styling global et responsive
   ├── js/app.js              - Helpers, API client, UI
   └── js/game.js             - Logique de jeu (placement, drag-drop)
 
 backend/
   ├── api/
-  │   ├── auth.php           - Authentification
-  │   └── game.php           - API de jeu
-  ├── GameLogic.php          - Validation, scoring
-  ├── db.php                 - Connexion BD (MySQL par défaut)
-  ├── bootstrap.php          - Config, sécurité
+  │   ├── auth.php           - Authentification, profil utilisateur
+  │   ├── game.php           - API de jeu
+  │   └── suggestions.php    - Suggestions de mots
+  ├── GameLogic.php          - Validation, scoring, suggestions
+  ├── AIPlayer.php           - IA basique pour mode solo
+  ├── Logger.php             - Logging structuré avec métriques
+  ├── db.php                 - Connexion BD (MySQL/SQLite)
+  ├── bootstrap.php          - Config, sécurité, CSRF
   └── env.php                - Chargement .env
+
+tests/
+  ├── GameLogicTest.php      - Tests unitaires
+  └── IntegrationTest.php    - Tests d'intégration
+
+docs/
+  ├── API.md                 - Documentation API
+  └── SECURITY.md            - Rapport de sécurité
 
 data/
   └── ods.txt                - Dictionnaire français Scrabble
@@ -104,28 +141,31 @@ Actions principales:
 ### GitHub Actions (CI/CD Automatisé)
 
 Les GitHub Actions exécutent automatiquement:
-1. **Lint** - Vérification de syntaxe PHP/JS
-2. **Test** - Tests unitaires (si configurés)
-3. **Deploy** - Upload FTP automatique (si succès)
+1. **Lint** - Vérification de syntaxe PHP/JS (PHPCS, JSHint)
+2. **Test** - Tests unitaires et d'intégration (PHPUnit)
+3. **Deploy** - Déploiement SSH automatique (si succès)
 
 Configuration: `.github/workflows/deploy.yml`
 
 **Secrets GitHub requis:**
-- `FTP_HOST`
-- `FTP_USER`
-- `FTP_PASS`
-- `DB_HOST` (serveur MySQL prod)
-- `DB_PORT` (port MySQL)
-- `DB_USER` (utilisateur MySQL prod)
-- `DB_PASS` (mot de passe MySQL prod)
-- `DB_NAME` (nom de la base MySQL prod)
+- `SSH_HOST` - Hôte du serveur de production
+- `SSH_USER` - Utilisateur SSH
+- `SSH_PORT` - Port SSH (défaut: 22)
+- `SSH_PRIVATE_KEY` - Clé privée SSH
+- `DB_HOST` - Serveur MySQL production
+- `DB_PORT` - Port MySQL
+- `DB_USER` - Utilisateur MySQL production
+- `DB_PASS` - Mot de passe MySQL production
+- `DB_NAME` - Nom de la base MySQL production
 
 ### Déploiement Manuel
 
-PowerShell script pour upload FTP:
-```powershell
-. .\deploy_ftp.ps1
-# Vous sera demandé: FTP password
+Pour un déploiement manuel via SSH:
+```bash
+ssh user@server
+cd /var/www/html
+git pull origin main
+composer install --no-dev --optimize-autoloader
 ```
 
 ### Base de Données
@@ -134,15 +174,29 @@ La base de données est **MySQL obligatoirement**. Pour les installations hérit
 
 **Schéma Principal:**
 ```sql
-users          - Comptes joueurs
-games          - Instances de parties
-game_players   - Lien joueur-partie + scores
-moves          - Historique des coups
-invitations    - Invitations en attente
-password_resets- Tokens réinitialisation
+users              - Comptes joueurs (avec bio, avatar, wins, losses)
+games              - Instances de parties
+game_players       - Lien joueur-partie + scores
+moves              - Historique des coups
+invitations        - Invitations en attente
+password_resets    - Tokens réinitialisation
+login_attempts     - Suivi des tentatives de login (sécurité)
 ```
 
 ## Tests
+
+### Exécuter les tests unitaires
+
+```bash
+# Installer PHPUnit
+composer require --dev phpunit/phpunit
+
+# Exécuter les tests
+vendor/bin/phpunit tests/
+
+# Ou avec le phar
+php phpunit-9.phar tests/
+```
 
 ### Tester le gameplay
 
@@ -153,7 +207,15 @@ password_resets- Tokens réinitialisation
 
 ### Logs d'erreur
 
-Voir `backend/logs/` pour les erreurs serveur.
+Voir `backend/logs/` pour les erreurs serveur. Les logs sont automatiquement rotatés après 30 jours.
+
+### Métriques de monitoring
+
+Les métriques sont disponibles via la classe Logger:
+```php
+$metrics = Logger::getMetrics();
+// Retourne: total_requests, errors, api_calls, avg_response_time_ms, uptime_seconds, error_rate
+```
 
 ## Règles du Scrabble
 
@@ -164,21 +226,54 @@ Voir `backend/logs/` pour les erreurs serveur.
 
 ## Développement futur
 
-- [ ] Rejouer une partie (replay)
-- [ ] Statistiques détaillées par joueur
+### Fonctionnalités Implémentées (Phase 1-5)
+- ✅ Politique de mot de passe renforcée
+- ✅ Verrouillage de compte après échecs
+- ✅ Session timeout sécurisé
+- ✅ Cache dictionnaire avec APCu
+- ✅ Tests unitaires (PHPUnit)
+- ✅ Tests d'intégration
+- ✅ Améliorations accessibilité (ARIA, skip links, focus)
+- ✅ Optimisation responsive mobile
+- ✅ Monitoring avec métriques (Logger)
+- ✅ Suggestions de mots
+- ✅ IA basique pour mode solo
+- ✅ Améliorations profil utilisateur (bio, avatar, stats)
+- ✅ Documentation API
+- ✅ Rapport de sécurité
+- ✅ Migration déploiement FTP → SSH
+
+### Fonctionnalités Restantes (Phase 4 - Basse Priorité)
+- [ ] Système de tournois
+- [ ] Classement ELO
+- [ ] Internationalisation (i18n)
+- [ ] Panel d'administration
 - [ ] Chat in-game
 - [ ] Matchmaking intelligent
-- [ ] Support mobile complet
-- [ ] AI simple pour mode solo avancé
 
 ## Bugs connus & Fixes
 
-**Phase 1 - Corrections effectuées:**
-- ✅ BUG #1: Placements qui disparaissaient (sauvegarde en session)
-- ✅ BUG #2: Transactions BD non-atomiques (ajout BEGIN/COMMIT)
-- ✅ BUG #3: Validation client/serveur incohérente (unifiée)
-- ✅ BUG #4: Jokers mal gérés en échange (fixed)
-- ✅ BUG #5: Timer désynchronisé (ajout server_timestamp)
+**Phase 1 - Corrections critiques effectuées:**
+- ✅ BUG #1: Message d'erreur non professionnel ("priez") → Message professionnel
+- ✅ BUG #2: Chargement dictionnaire inefficace → Cache APCu
+- ✅ BUG #3: Race conditions possibles → Locks dans transactions
+- ✅ BUG #4: Timer désynchronisé → Synchronisation avec server_timestamp
+- ✅ BUG #5: Politique mot de passe faible → Exigences de complexité
+- ✅ BUG #6: Pas de verrouillage compte → Système de lockout implémenté
+- ✅ BUG #7: Session timeout trop long → Réduit à 2 heures
+
+**Améliorations supplémentaires:**
+- ✅ Tests unitaires ajoutés
+- ✅ Tests d'intégration ajoutés
+- ✅ Accessibilité améliorée (ARIA, skip links)
+- ✅ Responsive mobile optimisé
+- ✅ Monitoring avec métriques
+- ✅ Suggestions de mots
+- ✅ IA basique pour solo
+- ✅ Profil utilisateur amélioré
+- ✅ Documentation API créée
+- ✅ Rapport de sécurité créé
+- ✅ Déploiement SSH au lieu de FTP
 
 ## Licence
 

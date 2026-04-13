@@ -135,6 +135,16 @@ try {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS login_attempts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            ip_address VARCHAR(45),
+            attempt_count INT DEFAULT 1,
+            locked_until TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         "CREATE TABLE IF NOT EXISTS games (
             id INT AUTO_INCREMENT PRIMARY KEY,
             status VARCHAR(50) DEFAULT 'waiting' COMMENT 'waiting, active, finished',
@@ -207,6 +217,16 @@ try {
             password_hash TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+        )",
+        "CREATE TABLE IF NOT EXISTS login_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            ip_address TEXT,
+            attempt_count INTEGER DEFAULT 1,
+            locked_until DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )",
         "CREATE TABLE IF NOT EXISTS games (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -299,6 +319,18 @@ try {
         if (!in_array('password_hash', $colNames, true)) {
             $pdo->exec("ALTER TABLE users ADD COLUMN password_hash TEXT");
         }
+        if (!in_array('bio', $colNames, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN bio TEXT");
+        }
+        if (!in_array('avatar', $colNames, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN avatar VARCHAR(255)");
+        }
+        if (!in_array('wins', $colNames, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN wins INTEGER DEFAULT 0");
+        }
+        if (!in_array('losses', $colNames, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0");
+        }
 
         $cols = $pdo->query("PRAGMA table_info(games)")->fetchAll();
         $colNames = array_map(function($c) { return $c['name']; }, $cols);
@@ -328,6 +360,22 @@ try {
         if (!in_array('details', $colNames, true)) {
             $pdo->exec("ALTER TABLE moves ADD COLUMN details TEXT");
         }
+
+        // Check and add login_attempts table if missing
+        $tables = $pdo->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll();
+        $tableNames = array_map(function($t) { return $t['name']; }, $tables);
+        if (!in_array('login_attempts', $tableNames)) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                ip_address TEXT,
+                attempt_count INTEGER DEFAULT 1,
+                locked_until DATETIME NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )");
+        }
     } else if ($db_type === 'mysql') {
         // For MySQL, use ALTER TABLE ... ADD COLUMN if missing
         $checkColumns = function($table) use ($pdo) {
@@ -338,6 +386,18 @@ try {
         $usersCols = $checkColumns('users');
         if (!in_array('password_hash', $usersCols)) {
             $pdo->exec("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)");
+        }
+        if (!in_array('bio', $usersCols)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN bio TEXT");
+        }
+        if (!in_array('avatar', $usersCols)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN avatar VARCHAR(255)");
+        }
+        if (!in_array('wins', $usersCols)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN wins INT DEFAULT 0");
+        }
+        if (!in_array('losses', $usersCols)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN losses INT DEFAULT 0");
         }
         if (!in_array('last_seen', $usersCols)) {
             $pdo->exec("ALTER TABLE users ADD COLUMN last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
@@ -366,6 +426,22 @@ try {
         }
         if (!in_array('details', $movesCols)) {
             $pdo->exec("ALTER TABLE moves ADD COLUMN details LONGTEXT");
+        }
+        
+        // Check and add login_attempts table if missing
+        $tables = $pdo->query("SHOW TABLES")->fetchAll();
+        $tableNames = array_map(function($t) { return array_values($t)[0]; }, $tables);
+        if (!in_array('login_attempts', $tableNames)) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT,
+                ip_address VARCHAR(45),
+                attempt_count INT DEFAULT 1,
+                locked_until TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         }
     }
 

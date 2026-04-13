@@ -10,7 +10,8 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="page-auth">
-    <div class="container auth-container">
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+    <div class="container auth-container" id="main-content">
         <div class="glass-card auth-card">
             <div class="brand">
                 <div class="brand-mark">S</div>
@@ -28,30 +29,31 @@
                 <button id="toggle-register" type="button">Inscription</button>
             </div>
 
-            <form id="login-form">
+            <form id="login-form" aria-label="Formulaire de connexion">
                 <input type="text" id="login-username" placeholder="Nom d'utilisateur" aria-label="Nom d'utilisateur" required maxlength="20" autocomplete="username">
-                <input type="password" id="login-password" placeholder="Mot de passe" aria-label="Mot de passe" required minlength="8" autocomplete="current-password">
-                <p class="helper">Astuce : votre mot de passe fait au moins 8 caractères.</p>
+                <input type="password" id="login-password" placeholder="Mot de passe" aria-label="Mot de passe" required minlength="10" autocomplete="current-password">
+                <p class="helper">Astuce : votre mot de passe fait au moins 10 caractères.</p>
                 <button type="submit">Se connecter</button>
             </form>
 
-            <form id="register-form" style="display:none;">
+            <form id="register-form" style="display:none;" aria-label="Formulaire d'inscription">
                 <input type="text" id="register-username" placeholder="Nom d'utilisateur" aria-label="Nom d'utilisateur" required maxlength="20" autocomplete="username">
-                <input type="password" id="register-password" placeholder="Mot de passe (min 8)" aria-label="Mot de passe" required minlength="8" autocomplete="new-password">
-                <input type="password" id="register-password-confirm" placeholder="Confirmer le mot de passe" aria-label="Confirmer le mot de passe" required minlength="8" autocomplete="new-password">
-                <p class="helper">Conseil : choisissez un mot de passe unique et mémorisable.</p>
+                <input type="password" id="register-password" placeholder="Mot de passe (min 10)" aria-label="Mot de passe" required minlength="10" autocomplete="new-password">
+                <input type="password" id="register-password-confirm" placeholder="Confirmer le mot de passe" aria-label="Confirmer le mot de passe" required minlength="10" autocomplete="new-password">
+                <p class="helper">Conseil : choisissez un mot de passe unique et mémorisable (10+ caractères avec majuscule, minuscule, chiffre et caractère spécial).</p>
                 <button type="submit">Créer le compte</button>
             </form>
 
             <div class="auth-reset">
-                <button id="toggle-reset" type="button" class="btn-ghost">Mot de passe oublié ?</button>
+                <button id="toggle-reset" type="button" class="btn-ghost" aria-label="Demander un nouveau mot de passe">Mot de passe oublié ?</button>
             </div>
 
-            <form id="reset-form" style="display:none;">
+            <form id="reset-form" style="display:none;" aria-label="Formulaire de réinitialisation de mot de passe">
                 <p class="helper">Entrez votre nom, demandez un code, puis choisissez un nouveau mot de passe.</p>
                 <input type="text" id="reset-username" placeholder="Nom d'utilisateur" aria-label="Nom d'utilisateur" required maxlength="20" autocomplete="username">
                 <input type="text" id="reset-token" placeholder="Code de réinitialisation" aria-label="Code de réinitialisation" required>
-                <input type="password" id="reset-password" placeholder="Nouveau mot de passe (min 8)" aria-label="Nouveau mot de passe" required minlength="8" autocomplete="new-password">
+                <input type="password" id="reset-password" placeholder="Nouveau mot de passe (min 10)" aria-label="Nouveau mot de passe" required minlength="10" autocomplete="new-password">
+                <p class="helper">Exigences: 10+ caractères avec majuscule, minuscule, chiffre et caractère spécial (!@#$%^&*(),.?":{}|<>)</p>
                 <button type="button" id="request-reset">Demander un code</button>
                 <button type="submit">Réinitialiser</button>
             </form>

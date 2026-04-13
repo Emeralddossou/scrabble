@@ -28,9 +28,97 @@ function authRateLimit() {
     }
 }
 
+function checkAccountLockout($pdo, $userId, $ipAddress) {
+    try {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $isMySQL = ($driver === 'mysql');
+        
+        if ($isMySQL) {
+            $stmt = $pdo->prepare("SELECT locked_until FROM login_attempts WHERE user_id = ? AND ip_address = ? AND locked_until > NOW() ORDER BY id DESC LIMIT 1");
+        } else {
+            $stmt = $pdo->prepare("SELECT locked_until FROM login_attempts WHERE user_id = ? AND ip_address = ? AND locked_until > datetime('now') ORDER BY id DESC LIMIT 1");
+        }
+        $stmt->execute([$userId, $ipAddress]);
+        $lock = $stmt->fetch();
+        
+        if ($lock && $lock['locked_until']) {
+            $lockTime = strtotime($lock['locked_until']);
+            $remaining = ceil(($lockTime - time()) / 60);
+            json_error("Compte temporairement verrouillé. Réessayez dans $remaining minute(s).", 429);
+        }
+    } catch (Exception $e) {
+        // If table doesn't exist yet, continue without lockout check
+        error_log("Lockout check failed: " . $e->getMessage());
+    }
+}
+
+function recordLoginAttempt($pdo, $userId, $ipAddress, $success) {
+    try {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $isMySQL = ($driver === 'mysql');
+        
+        if ($success) {
+            // Reset attempts on successful login
+            $stmt = $pdo->prepare("DELETE FROM login_attempts WHERE user_id = ?");
+            $stmt->execute([$userId]);
+        } else {
+            // Increment attempt count
+            $stmt = $pdo->prepare("SELECT id, attempt_count FROM login_attempts WHERE user_id = ? AND ip_address = ? ORDER BY id DESC LIMIT 1");
+            $stmt->execute([$userId, $ipAddress]);
+            $existing = $stmt->fetch();
+            
+            if ($existing) {
+                $newCount = $existing['attempt_count'] + 1;
+                if ($newCount >= 5) {
+                    // Lock account for 30 minutes
+                    if ($isMySQL) {
+                        $lockUntil = "DATE_ADD(NOW(), INTERVAL 30 MINUTE)";
+                    } else {
+                        $lockUntil = "datetime('now', '+30 minutes')";
+                    }
+                    $stmt = $pdo->prepare("UPDATE login_attempts SET attempt_count = ?, locked_until = $lockUntil, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$newCount, $existing['id']]);
+                } else {
+                    $stmt = $pdo->prepare("UPDATE login_attempts SET attempt_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$newCount, $existing['id']]);
+                }
+            } else {
+                if ($isMySQL) {
+                    $stmt = $pdo->prepare("INSERT INTO login_attempts (user_id, ip_address, attempt_count) VALUES (?, ?, 1)");
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO login_attempts (user_id, ip_address, attempt_count) VALUES (?, ?, 1)");
+                }
+                $stmt->execute([$userId, $ipAddress]);
+            }
+        }
+    } catch (Exception $e) {
+        // If table doesn't exist yet, log error but continue
+        error_log("Login attempt recording failed: " . $e->getMessage());
+    }
+}
+
 function validateUsername($username) {
     if (strlen($username) < 3 || strlen($username) > 20) return false;
     return preg_match('/^[A-Za-z0-9_.-]+$/', $username);
+}
+
+function validatePasswordStrength($password) {
+    // Minimum 10 characters
+    if (strlen($password) < 10) return false;
+    
+    // Must contain at least one uppercase letter
+    if (!preg_match('/[A-Z]/', $password)) return false;
+    
+    // Must contain at least one lowercase letter
+    if (!preg_match('/[a-z]/', $password)) return false;
+    
+    // Must contain at least one digit
+    if (!preg_match('/[0-9]/', $password)) return false;
+    
+    // Must contain at least one special character
+    if (!preg_match('/[!@#$%^&*(),.?":{}|<>]/', $password)) return false;
+    
+    return true;
 }
 
 if ($action === 'csrf') {
@@ -51,8 +139,8 @@ if ($action === 'register') {
     if (!validateUsername($username)) {
         json_error('Nom d\'utilisateur invalide (3-20 caractères, lettres/chiffres/._-)');
     }
-    if (strlen($password) < 8) {
-        json_error('Mot de passe trop court (min 8)');
+    if (!validatePasswordStrength($password)) {
+        json_error('Mot de passe trop faible. Minimum 10 caractères avec au moins une majuscule, une minuscule, un chiffre et un caractère spécial (!@#$%^&*(),.?":{}|<>)');
     }
 
     $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
@@ -73,6 +161,7 @@ if ($action === 'register') {
     $data = json_decode(file_get_contents('php://input'), true);
     $username = trim($data['username'] ?? '');
     $password = $data['password'] ?? '';
+    $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
     if (empty($username) || empty($password)) {
         json_error('Nom d\'utilisateur et mot de passe requis');
@@ -83,8 +172,18 @@ if ($action === 'register') {
     $user = $stmt->fetch();
 
     if (!$user || empty($user['password_hash']) || !password_verify($password, $user['password_hash'])) {
+        // Record failed attempt if user exists
+        if ($user) {
+            recordLoginAttempt($pdo, $user['id'], $ipAddress, false);
+        }
         json_error('Identifiants invalides', 401);
     }
+
+    // Check if account is locked
+    checkAccountLockout($pdo, $user['id'], $ipAddress);
+
+    // Record successful login
+    recordLoginAttempt($pdo, $user['id'], $ipAddress, true);
 
     $stmt = $pdo->prepare("UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?");
     $stmt->execute([$user['id']]);
@@ -132,8 +231,8 @@ if ($action === 'register') {
     $current = $data['current_password'] ?? '';
     $next = $data['new_password'] ?? '';
 
-    if (strlen($next) < 8) {
-        json_error('Nouveau mot de passe trop court (min 8)');
+    if (!validatePasswordStrength($next)) {
+        json_error('Nouveau mot de passe trop faible. Minimum 10 caractères avec au moins une majuscule, une minuscule, un chiffre et un caractère spécial (!@#$%^&*(),.?":{}|<>)');
     }
 
     $stmt = $pdo->prepare("SELECT password_hash FROM users WHERE id = ?");
@@ -148,6 +247,26 @@ if ($action === 'register') {
     $stmt->execute([$hash, $_SESSION['user_id']]);
 
     echo json_encode(['success' => true]);
+
+} elseif ($action === 'update_profile') {
+    require_csrf();
+    if (!isset($_SESSION['user_id'])) {
+        json_error('Non connecté', 401);
+    }
+    $data = json_decode(file_get_contents('php://input'), true);
+    $bio = trim($data['bio'] ?? '');
+    $avatar = trim($data['avatar'] ?? '');
+    
+    // Validate bio length
+    if (strlen($bio) > 500) {
+        json_error('Bio trop longue (max 500 caractères)');
+    }
+    
+    $stmt = $pdo->prepare("UPDATE users SET bio = ?, avatar = ? WHERE id = ?");
+    $stmt->execute([$bio, $avatar, $_SESSION['user_id']]);
+    
+    echo json_encode(['success' => true]);
+
 } elseif ($action === 'stats') {
     if (!isset($_SESSION['user_id'])) {
         json_error('Non connecté', 401);
@@ -201,8 +320,8 @@ if ($action === 'register') {
     $data = json_decode(file_get_contents('php://input'), true);
     $token = trim($data['token'] ?? '');
     $newPass = $data['new_password'] ?? '';
-    if (strlen($newPass) < 8) {
-        json_error('Mot de passe trop court (min 8)');
+    if (!validatePasswordStrength($newPass)) {
+        json_error('Mot de passe trop faible. Minimum 10 caractères avec au moins une majuscule, une minuscule, un chiffre et un caractère spécial (!@#$%^&*(),.?":{}|<>)');
     }
     $nowExpr = $isMySQL ? "NOW()" : "datetime('now')";
     $stmt = $pdo->prepare("SELECT pr.user_id FROM password_resets pr WHERE pr.token = ? AND pr.expires_at > $nowExpr");

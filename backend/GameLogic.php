@@ -256,12 +256,24 @@ class GameLogic {
     }
 
     public function isValidWord($word) {
-        // Phase 7: Improved caching for dictionary
+        // Phase 7: Improved caching for dictionary with APCu
         static $dictionary = null;
         static $dictPath = null;
+        static $useCache = true;
         
         if ($dictionary === null) {
             $dictPath = __DIR__ . '/../data/ods.txt';
+            $cacheKey = 'scrabble_dict_' . md5($dictPath);
+            
+            // Try to load from APCu cache first
+            if ($useCache && function_exists('apcu_fetch')) {
+                $cachedDict = apcu_fetch($cacheKey);
+                if ($cachedDict !== false) {
+                    $dictionary = $cachedDict;
+                    return $this->checkWordInDictionary($dictionary, $word);
+                }
+            }
+            
             if (!file_exists($dictPath)) {
                 // If dictionary doesn't exist, accept any word (for testing)
                 return true;
@@ -270,8 +282,17 @@ class GameLogic {
             // Load dictionary with case-insensitive lookup
             $lines = file($dictPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             $dictionary = array_flip(array_map('strtoupper', $lines));
+            
+            // Store in APCu cache for 1 hour
+            if ($useCache && function_exists('apcu_store')) {
+                apcu_store($cacheKey, $dictionary, 3600);
+            }
         }
         
+        return $this->checkWordInDictionary($dictionary, $word);
+    }
+    
+    private function checkWordInDictionary($dictionary, $word) {
         $upperWord = strtoupper($word);
         
         // Allow blanks (lowercase letters represent jokers)
@@ -282,6 +303,78 @@ class GameLogic {
         }
         
         return isset($dictionary[$upperWord]);
+    }
+    
+    public function getWordSuggestions($rack, $board = null, $limit = 10) {
+        $suggestions = [];
+        $dictPath = __DIR__ . '/../data/ods.txt';
+        
+        if (!file_exists($dictPath)) {
+            return $suggestions;
+        }
+        
+        // Load dictionary
+        $lines = file($dictPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $dictionary = array_flip(array_map('strtoupper', $lines));
+        
+        // Count letter frequencies in rack
+        $rackCount = array_count_values($rack);
+        $blankCount = $rackCount['*'] ?? 0;
+        unset($rackCount['*']);
+        
+        // Try each word in dictionary
+        foreach (array_keys($dictionary) as $word) {
+            if (strlen($word) < 2) continue; // Skip short words
+            if (strlen($word) > count($rack) + $blankCount) continue; // Too long
+            
+            $wordCount = array_count_values(str_split($word));
+            $canForm = true;
+            $blanksNeeded = 0;
+            
+            foreach ($wordCount as $letter => $count) {
+                $available = $rackCount[$letter] ?? 0;
+                if ($available < $count) {
+                    $blanksNeeded += ($count - $available);
+                    if ($blanksNeeded > $blankCount) {
+                        $canForm = false;
+                        break;
+                    }
+                }
+            }
+            
+            if ($canForm) {
+                $score = $this->calculateWordScore($word);
+                $suggestions[] = [
+                    'word' => $word,
+                    'score' => $score,
+                    'length' => strlen($word)
+                ];
+            }
+        }
+        
+        // Sort by score descending
+        usort($suggestions, function($a, $b) {
+            return $b['score'] - $a['score'];
+        });
+        
+        return array_slice($suggestions, 0, $limit);
+    }
+    
+    private function calculateWordScore($word) {
+        $points = [
+            'A' => 1, 'B' => 3, 'C' => 3, 'D' => 2, 'E' => 1, 'F' => 4,
+            'G' => 2, 'H' => 4, 'I' => 1, 'J' => 8, 'K' => 10, 'L' => 1,
+            'M' => 2, 'N' => 1, 'O' => 1, 'P' => 3, 'Q' => 8, 'R' => 1,
+            'S' => 1, 'T' => 1, 'U' => 1, 'V' => 4, 'W' => 10, 'X' => 10,
+            'Y' => 10, 'Z' => 10
+        ];
+        
+        $score = 0;
+        foreach (str_split($word) as $letter) {
+            $score += $points[$letter] ?? 0;
+        }
+        
+        return $score;
     }
 }
 ?>
