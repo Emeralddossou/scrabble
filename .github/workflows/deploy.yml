@@ -98,15 +98,26 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy via SSH
+    name: Deploy via FTP
     needs: [lint, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
+
+      - name: Check FTP Secrets
+        run: |
+          if [ -z "${{ secrets.FTP_HOST }}" ] || [ -z "${{ secrets.FTP_USER }}" ] || [ -z "${{ secrets.FTP_PASS }}" ]; then
+            echo "❌ FTP secrets not configured. Skipping deployment."
+            echo "Please configure the following secrets in GitHub repository settings:"
+            echo "  - FTP_HOST"
+            echo "  - FTP_USER"
+            echo "  - FTP_PASS"
+            exit 0
+          fi
+
       - name: Create .env for Production
         run: |
           cat > .env << EOF
@@ -117,35 +128,32 @@ jobs:
           DB_PASS=${{ secrets.DB_PASS }}
           DB_NAME=${{ secrets.DB_NAME }}
           DB_ALLOW_FALLBACK=false
-          SSH_HOST=${{ secrets.SSH_HOST }}
-          SSH_USER=${{ secrets.SSH_USER }}
-          SSH_PORT=${{ secrets.SSH_PORT }}
+          FTP_HOST=${{ secrets.FTP_HOST }}
+          FTP_USER=${{ secrets.FTP_USER }}
+          FTP_PASS=${{ secrets.FTP_PASS }}
           APP_ENV=production
           APP_DEBUG=false
           EOF
           cp .env env.production
-      
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-      
-      - name: Deploy via SSH
-        run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
-            cd /var/www/html
-            git pull origin main
-            composer install --no-dev --optimize-autoloader
-            php artisan migrate --force
-          ENDSSH
-      
+
+      - name: Setup FTP Deploy Action
+        uses: milanmk/actions-file-deployer@master
+        with:
+          remote-protocol: ftp
+          remote-host: ${{ secrets.FTP_HOST }}
+          remote-port: 21
+          remote-user: ${{ secrets.FTP_USER }}
+          remote-password: ${{ secrets.FTP_PASS }}
+          local-path: .
+          remote-path: /htdocs
+          sync: full
+          ftp-options: --ignore-time --allow-empty-file
+
       - name: Deploy Summary
         if: success()
         run: |
           echo "✅ Deployment successful!"
-          echo "App deployed to: ${{ secrets.SSH_HOST }}"
+          echo "App deployed to: ${{ secrets.FTP_HOST }}"
 
       - name: Notify on Failure
         if: failure()

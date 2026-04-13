@@ -143,15 +143,14 @@ Actions principales:
 Les GitHub Actions exécutent automatiquement:
 1. **Lint** - Vérification de syntaxe PHP/JS (PHPCS, JSHint)
 2. **Test** - Tests unitaires et d'intégration (PHPUnit)
-3. **Deploy** - Déploiement SSH automatique (si succès)
+3. **Deploy** - Déploiement FTP automatique (si succès)
 
 Configuration: `.github/workflows/deploy.yml`
 
 **Secrets GitHub requis:**
-- `SSH_HOST` - Hôte du serveur de production
-- `SSH_USER` - Utilisateur SSH
-- `SSH_PORT` - Port SSH (défaut: 22)
-- `SSH_PRIVATE_KEY` - Clé privée SSH
+- `FTP_HOST` - Hôte FTP du serveur de production
+- `FTP_USER` - Utilisateur FTP
+- `FTP_PASS` - Mot de passe FTP
 - `DB_HOST` - Serveur MySQL production
 - `DB_PORT` - Port MySQL
 - `DB_USER` - Utilisateur MySQL production
@@ -160,12 +159,10 @@ Configuration: `.github/workflows/deploy.yml`
 
 ### Déploiement Manuel
 
-Pour un déploiement manuel via SSH:
-```bash
-ssh user@server
-cd /var/www/html
-git pull origin main
-composer install --no-dev --optimize-autoloader
+Pour un déploiement manuel via FTP, utilisez un client FTP (FileZilla, WinSCP) ou le script PowerShell:
+```powershell
+. .\deploy_ftp.ps1
+# Vous sera demandé: FTP password
 ```
 
 ### Base de Données
@@ -241,7 +238,7 @@ $metrics = Logger::getMetrics();
 - ✅ Améliorations profil utilisateur (bio, avatar, stats)
 - ✅ Documentation API
 - ✅ Rapport de sécurité
-- ✅ Migration déploiement FTP → SSH
+- ✅ Amélioration déploiement FTP avec validation des secrets
 
 ### Fonctionnalités Restantes (Phase 4 - Basse Priorité)
 - [ ] Système de tournois

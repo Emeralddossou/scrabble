@@ -50,10 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Database schema documentation
 
 ### Changed - Deployment (Phase 4.1)
-- Migrated deployment from FTP to SSH for improved security
-- Updated GitHub Actions workflow for SSH-based deployment
-- Added SSH key configuration in deployment workflow
-- Removed legacy FTP deployment script
+- Attempted migration from FTP to SSH (reverted - SSH not available on server)
+- Kept FTP deployment with improved error handling
+- Added FTP secrets validation in GitHub Actions workflow
+- Deployment skips gracefully if FTP secrets are not configured
 
 ### Changed - UI/UX (Phase 2.3)
 - Improved responsive design for mobile devices
