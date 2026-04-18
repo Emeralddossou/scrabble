@@ -121,6 +121,8 @@
         window.APP_DEBUG = <?php echo $appDebug ? 'true' : 'false'; ?>;
     </script>
     <script src="js/app.js"></script>
+    <script src="js/BoardLayout.js"></script>    <!-- ➕ AJOUTER CETTE LIGNE -->
+    <script src="js/GameManager.js"></script>    <!-- ➕ AJOUTER CETTE LIGNE -->
     <script src="js/game.js"></script>
 </body>
 </html>

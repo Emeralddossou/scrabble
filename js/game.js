@@ -19,23 +19,13 @@ let performanceMetrics = {
     lastUpdate: Date.now()
 };
 
-const BOARD_LAYOUT = [
-    ['tw', '', '', 'dl', '', '', '', 'tw', '', '', '', 'dl', '', '', 'tw'],
-    ['', 'dw', '', '', '', 'tl', '', '', '', 'tl', '', '', '', 'dw', ''],
-    ['', '', 'dw', '', '', '', 'dl', '', 'dl', '', '', '', 'dw', '', ''],
-    ['dl', '', '', 'dw', '', '', '', 'dl', '', '', '', 'dw', '', '', 'dl'],
-    ['', '', '', '', 'dw', '', '', '', '', '', 'dw', '', '', '', ''],
-    ['', 'tl', '', '', '', 'tl', '', '', '', 'tl', '', '', '', 'tl', ''],
-    ['', '', 'dl', '', '', '', 'dl', '', 'dl', '', '', '', 'dl', '', ''],
-    ['tw', '', '', 'dl', '', '', '', 'st', '', '', '', 'dl', '', '', 'tw'],
-    ['', '', 'dl', '', '', '', 'dl', '', 'dl', '', '', '', 'dl', '', ''],
-    ['', 'tl', '', '', '', 'tl', '', '', '', 'tl', '', '', '', 'tl', ''],
-    ['', '', '', '', 'dw', '', '', '', '', '', 'dw', '', '', '', ''],
-    ['dl', '', '', 'dw', '', '', '', 'dl', '', '', '', 'dw', '', '', 'dl'],
-    ['', '', 'dw', '', '', '', 'dl', '', 'dl', '', '', '', 'dw', '', ''],
-    ['', 'dw', '', '', '', 'tl', '', '', '', 'tl', '', '', '', 'dw', ''],
-    ['tw', '', '', 'dl', '', '', '', 'tw', '', '', '', 'dl', '', '', 'tw']
-];
+// Use BoardLayout from BoardLayout.js
+const BOARD_LAYOUT = (typeof BoardLayout !== 'undefined') ? BoardLayout.BOARD_LAYOUT : console.error('❌ BoardLayout.js must be loaded before game.js') || [];
+
+// Constants for better code organization
+const ALPHABET_SIZE = 26;
+const ASCII_A = 65;
+const BOARD_SIZE = 15;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!gameId) {

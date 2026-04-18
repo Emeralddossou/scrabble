@@ -2,6 +2,7 @@
 // backend/GameLogic.php - Game logic and validation
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/BoardLayout.php';
 
 class GameLogic {
     private $pdo;
@@ -33,24 +34,7 @@ class GameLogic {
     }
 
     public function getMultiplier($r, $c) {
-        $layout = [
-            ['tw','','','dl','','','','tw','','','','dl','','','tw'],
-            ['','dw','','','','tl','','','','tl','','','','dw',''],
-            ['','','dw','','','','dl','','dl','','','','dw','',''],
-            ['dl','','','dw','','','','dl','','','','dw','','','dl'],
-            ['','','','','dw','','','','','','dw','','','',''],
-            ['','tl','','','','tl','','','','tl','','','','tl',''],
-            ['','','dl','','','','dl','','dl','','','','dl','',''],
-            ['tw','','','dl','','','','st','','','','dl','','','tw'],
-            ['','','dl','','','','dl','','dl','','','','dl','',''],
-            ['','tl','','','','tl','','','','tl','','','','tl',''],
-            ['','','','','dw','','','','','','dw','','','',''],
-            ['dl','','','dw','','','','dl','','','','dw','','','dl'],
-            ['','','dw','','','','dl','','dl','','','','dl','',''],
-            ['','dw','','','','tl','','','','tl','','','','dw',''],
-            ['tw','','','dl','','','','tw','','','','dl','','','tw']
-        ];
-        return $layout[$r][$c] ?? '';
+        return BoardLayout::getMultiplier($r, $c);
     }
 
     public function initializeBag() {
