@@ -1,6 +1,10 @@
 ﻿<?php
 // backend/api/auth.php - Authentication endpoints
 
+// ➕ CORRECTIF: Désactiver les logs bruyants qui corrompent le JSON
+error_reporting(E_ERROR); // Ne montrer que les erreurs fatales
+ini_set('display_errors', '0'); // Ne PAS afficher à l'écran (garde le JSON propre)
+
 require_once dirname(__DIR__) . '/bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
