@@ -3,7 +3,8 @@
     "allow": [
       "Bash(php -r \"require 'backend/db.php'; echo 'DB load OK';\")",
       "Bash(php -l \"d:/CODE/scrabble/backend/BoardLayout.php\")",
-      "Bash(php -l \"d:/CODE/scrabble/backend/GameLogic.php\")"
+      "Bash(php -l \"d:/CODE/scrabble/backend/GameLogic.php\")",
+      "Bash(php -l \"d:/CODE/scrabble/backend/api/auth.php\")"
     ]
   }
 }

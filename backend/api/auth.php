@@ -1,11 +1,29 @@
 ﻿<?php
 // backend/api/auth.php - Authentication endpoints
 
-// ➕ CORRECTIF: Désactiver les logs bruyants qui corrompent le JSON
-error_reporting(E_ERROR); // Ne montrer que les erreurs fatales
-ini_set('display_errors', '0'); // Ne PAS afficher à l'écran (garde le JSON propre)
+// ➕ CORRECTIF: Gestion d'erreurs ULTRA ROBUSTE
+// 1. Désactiver la sortie d'erreur directe
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
 
-require_once dirname(__DIR__) . '/bootstrap.php';
+// 2. Créer un fichier de log dedié
+$logFile = __DIR__ . '/../../logs/auth_errors.log';
+ini_set('log_errors', '1');
+ini_set('error_log', $logFile);
+
+// 3. S'assurer que le répertoire de logs existe
+@mkdir(dirname($logFile), 0777, true);
+
+// 4. ⭐ ENVELOPPER TOUTE LE CONTENU dans try/catch global pour éviter tout crash
+try {
+    ob_start(); // Capturer toute sortie accidentelle
+
+    require_once dirname(__DIR__) . '/bootstrap.php';
+
+    // Forcer les en-têtes JSON
+    header('Content-Type: application/json; charset=utf-8');
+
+    // Reste du code ici...
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -383,8 +401,34 @@ if ($action === 'register') {
     $stats = $stmt->fetch();
 
     echo json_encode(['success' => true, 'user' => $user, 'stats' => $stats]);
+
+} catch (Exception $e) {
+    // Global error handler - ensures JSON is always returned
+    error_log("AUTH ERROR: " . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
+
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+
+    // Return clean JSON error
+    $errorCode = uniqid('auth_');
+    $response = [
+        'error' => 'Internal server error',
+        'code' => 500,
+        'request_id' => $errorCode
+    ];
+
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+
+    // Write detailed error to log file
+    $logFile = __DIR__ . '/../../logs/auth_errors.log';
+    @file_put_contents($logFile, sprintf(
+        "[%s] CODE: %s\nMESSAGE: %s\nTRACE: %s\n\n",
+        date('Y-m-d H:i:s'),
+        $errorCode,
+        $e->getMessage(),
+        $e->getTraceAsString()
+    ), FILE_APPEND | LOCK_EX);
 }
-?>
 
 
 
