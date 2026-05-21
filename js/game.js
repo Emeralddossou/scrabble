@@ -10,6 +10,7 @@ let exchangeMode = false;
 let exchangeSelections = new Set();
 let isMyTurn = false;
 let lastBoard = null;
+let fetchStateErrorOpen = false;
 
 // Phase 7: Performance monitoring
 let performanceMetrics = {
@@ -320,9 +321,10 @@ function getCellClass(r, c) {
 async function fetchGameState() {
     const res = await api(`game.php?action=state&id=${gameId}`);
     if (!res || res.error) {
-        uiAlert(res?.error || 'Erreur serveur');
+        handleGameStateError(res);
         return;
     }
+    fetchStateErrorOpen = false;
 
     gameState = res.game;
     const me = res.me;
@@ -431,6 +433,32 @@ async function fetchGameState() {
     if (isMyTurn && !savePlacementsTimer) {
         startSavingPlacements();
     }
+}
+
+function handleGameStateError(res) {
+    const message = res?.error || 'Erreur serveur';
+    const status = res?.status || 0;
+
+    if (status === 401 || status === 403) {
+        if (fetchStateErrorOpen) return;
+        fetchStateErrorOpen = true;
+        uiAlert(message).then(() => {
+            window.location.href = 'dashboard.php';
+        });
+        return;
+    }
+
+    if (fetchStateErrorOpen) return;
+    fetchStateErrorOpen = true;
+    const statusEl = document.getElementById('game-status');
+    if (statusEl) {
+        statusEl.textContent = message;
+        statusEl.style.color = '#f87171';
+    }
+    uiToast(message, 'error', 1800);
+    setTimeout(() => {
+        fetchStateErrorOpen = false;
+    }, 2500);
 }
 
 function disableActions() {

@@ -178,5 +178,3 @@ function maybe_cleanup($pdo) {
         $pdo->exec("DELETE FROM password_resets WHERE expires_at < datetime('now')");
     }
 }
-?>
-

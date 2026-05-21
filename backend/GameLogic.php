@@ -244,18 +244,22 @@ class GameLogic {
     public function isValidWord($word) {
         // Phase 7: Improved caching for dictionary with APCu
         static $dictionary = null;
+        static $dictionaryByLength = null;
         static $dictPath = null;
         static $useCache = true;
         
         if ($dictionary === null) {
             $dictPath = __DIR__ . '/../data/ods.txt';
             $cacheKey = 'scrabble_dict_' . md5($dictPath);
+            $lengthCacheKey = $cacheKey . '_lengths';
             
             // Try to load from APCu cache first
             if ($useCache && function_exists('apcu_fetch')) {
                 $cachedDict = apcu_fetch($cacheKey);
-                if ($cachedDict !== false) {
+                $cachedByLength = apcu_fetch($lengthCacheKey);
+                if ($cachedDict !== false && $cachedByLength !== false) {
                     $dictionary = $cachedDict;
+                    $dictionaryByLength = $cachedByLength;
                     return $this->checkWordInDictionary($dictionary, $word);
                 }
             }
@@ -268,24 +272,44 @@ class GameLogic {
             // Load dictionary with case-insensitive lookup
             $lines = file($dictPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             $dictionary = array_flip(array_map('strtoupper', $lines));
+            $dictionaryByLength = [];
+            foreach (array_keys($dictionary) as $entry) {
+                $length = strlen($entry);
+                if (!isset($dictionaryByLength[$length])) {
+                    $dictionaryByLength[$length] = [];
+                }
+                $dictionaryByLength[$length][] = $entry;
+            }
             
             // Store in APCu cache for 1 hour
             if ($useCache && function_exists('apcu_store')) {
                 apcu_store($cacheKey, $dictionary, 3600);
+                apcu_store($lengthCacheKey, $dictionaryByLength, 3600);
             }
         }
         
-        return $this->checkWordInDictionary($dictionary, $word);
+        return $this->checkWordInDictionary($dictionary, $word, $dictionaryByLength);
     }
     
-    private function checkWordInDictionary($dictionary, $word) {
+    private function checkWordInDictionary($dictionary, $word, $dictionaryByLength = []) {
         $upperWord = strtoupper($word);
         
         // Allow blanks (lowercase letters represent jokers)
         if (preg_match('/[a-z]/', $word)) {
-            // Word contains jokers, still need to validate other letters
-            $testWord = preg_replace('/[a-z]/', 'A', $upperWord);
-            return isset($dictionary[$testWord]);
+            $candidates = $dictionaryByLength[strlen($upperWord)] ?? [];
+            foreach ($candidates as $candidate) {
+                $matches = true;
+                for ($i = 0; $i < strlen($word); $i++) {
+                    if (!ctype_lower($word[$i]) && $candidate[$i] !== $upperWord[$i]) {
+                        $matches = false;
+                        break;
+                    }
+                }
+                if ($matches) {
+                    return true;
+                }
+            }
+            return false;
         }
         
         return isset($dictionary[$upperWord]);

@@ -164,4 +164,9 @@ class GameLogicTest extends TestCase {
         $result = $this->logic->isValidWord('SCRABBLE');
         $this->assertTrue($result);
     }
+
+    public function testIsValidWordWithBlankTileSubstitution() {
+        $this->assertTrue($this->logic->isValidWord('CHaT'));
+        $this->assertFalse($this->logic->isValidWord('QqQqQq'));
+    }
 }

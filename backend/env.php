@@ -264,25 +264,19 @@ if (!function_exists('env_get')) {
                 $env = readEnvFile();
             }
         }
-        
-        // Check env array first
+
         if (isset($env[$key])) {
             return $env[$key];
         }
-        
-        // Check $_ENV
         if (isset($_ENV[$key])) {
             return $_ENV[$key];
         }
-        
-        // Check getenv (careful with null parameter)
+
         $val = getenv($key);
         if ($val !== false) {
             return $val;
         }
-        
+
         return $default;
     }
 }
-?>
-

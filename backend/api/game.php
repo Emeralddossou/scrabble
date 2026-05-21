@@ -12,6 +12,7 @@ header('Content-Type: application/json; charset=utf-8');
 // Phase 7: Performance tracking
 $startTime = microtime(true);
 $logger = Logger::getInstance();
+const SCORELESS_TURNS_TO_END = 6;
 
 if (!isset($_SESSION['user_id'])) {
     json_error('Unauthorized', 401);
@@ -37,6 +38,23 @@ function normalizeMoves($moves) {
         $letter = strtoupper(trim($m['letter'] ?? ''));
         $isBlank = !empty($m['is_blank']);
         $normalized[] = ['r' => $r, 'c' => $c, 'letter' => $letter, 'is_blank' => $isBlank];
+    }
+    return $normalized;
+}
+
+function normalizePlacementDrafts($placements) {
+    $normalized = [];
+    foreach ($placements as $m) {
+        $normalizedMove = normalizeMoves([$m])[0];
+        $rackLetter = strtoupper(trim($m['rack_letter'] ?? ''));
+        if (!preg_match('/^[A-Z*]$/', $rackLetter)) {
+            $rackLetter = $normalizedMove['is_blank'] ? '*' : $normalizedMove['letter'];
+        }
+        $normalizedMove['rack_letter'] = $rackLetter;
+        $normalized[] = $normalizedMove;
+        if (count($normalized) >= 7) {
+            break;
+        }
     }
     return $normalized;
 }
@@ -77,7 +95,7 @@ function applyEndScores($pdo, $game_id, $logic) {
 function finishGame($pdo, $game_id, $winner_id = null, $reason = 'end') {
     $stmt = $pdo->prepare("UPDATE games SET status = 'finished', winner_id = ?, ended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, last_move_at = CURRENT_TIMESTAMP WHERE id = ?");
     $stmt->execute([$winner_id, $game_id]);
-    logMove($pdo, $game_id, $winner_id ?? 0, 'end', strtoupper($reason), 0, null, json_encode(['reason' => $reason]));
+    logMove($pdo, $game_id, $winner_id, 'end', strtoupper($reason), 0, null, json_encode(['reason' => $reason]));
 }
 
 function updateTimerIfExpired($pdo, $game, $players) {
@@ -101,6 +119,25 @@ function updateTimerIfExpired($pdo, $game, $players) {
         }
     }
     return $players;
+}
+
+function fetchGameOrFail($pdo, $game_id) {
+    $stmt = $pdo->prepare("SELECT * FROM games WHERE id = ?");
+    $stmt->execute([$game_id]);
+    $game = $stmt->fetch();
+    if (!$game) {
+        json_error('Game not found', 404);
+    }
+    return $game;
+}
+
+function refreshGameForAction($pdo, $game_id) {
+    $game = fetchGameOrFail($pdo, $game_id);
+    $stmt = $pdo->prepare("SELECT user_id, time_remaining FROM game_players WHERE game_id = ? ORDER BY turn_order");
+    $stmt->execute([$game_id]);
+    $players = $stmt->fetchAll();
+    updateTimerIfExpired($pdo, $game, $players);
+    return fetchGameOrFail($pdo, $game_id);
 }
 
 if ($action === 'invite') {
@@ -292,11 +329,7 @@ if ($action === 'invite') {
         json_error('Accès refusé', 403);
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM games WHERE id = ?");
-    $stmt->execute([$game_id]);
-    $game = $stmt->fetch();
-
-    if (!$game) { json_error('Game not found', 404); }
+    $game = refreshGameForAction($pdo, $game_id);
 
     $stmt = $pdo->prepare("UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?");
     $stmt->execute([$user_id]);
@@ -304,11 +337,6 @@ if ($action === 'invite') {
     $stmt = $pdo->prepare("SELECT gp.*, u.username FROM game_players gp JOIN users u ON gp.user_id = u.id WHERE game_id = ? ORDER BY turn_order");
     $stmt->execute([$game_id]);
     $players = $stmt->fetchAll();
-
-    $players = updateTimerIfExpired($pdo, $game, $players);
-    $stmt = $pdo->prepare("SELECT * FROM games WHERE id = ?");
-    $stmt->execute([$game_id]);
-    $game = $stmt->fetch();
 
     $my_rack = [];
     foreach ($players as $p) {
@@ -343,9 +371,7 @@ if ($action === 'invite') {
         json_error('Accès refusé', 403);
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM games WHERE id = ?");
-    $stmt->execute([$game_id]);
-    $game = $stmt->fetch();
+    $game = refreshGameForAction($pdo, $game_id);
 
     if ($game['status'] !== 'active') {
         json_error('Partie terminée', 400);
@@ -501,9 +527,7 @@ if ($action === 'invite') {
         json_error('Aucune lettre sélectionnée');
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM games WHERE id = ?");
-    $stmt->execute([$game_id]);
-    $game = $stmt->fetch();
+    $game = refreshGameForAction($pdo, $game_id);
 
     if ($game['status'] !== 'active') {
         json_error('Partie terminée', 400);
@@ -521,16 +545,11 @@ if ($action === 'invite') {
     $stmt->execute([$game_id, $user_id]);
     $rack = json_decode($stmt->fetch()['rack'], true);
 
-    // BUG #4 Fix: Properly handle jokers/blanks in exchange
     $rackCounts = array_count_values($rack);
     $lettersToExchange = [];
     foreach ($letters as $letter) {
         $letter = strtoupper($letter);
-        // If letter not in rack but joker available, swap
         $checkLetter = $letter;
-        if (empty($rackCounts[$checkLetter]) && !empty($rackCounts['*'])) {
-            $checkLetter = '*';
-        }
         if (empty($rackCounts[$checkLetter])) {
             json_error('Vous ne possédez pas toutes ces lettres');
         }
@@ -567,7 +586,7 @@ if ($action === 'invite') {
     $stmt = $pdo->prepare("SELECT consecutive_passes FROM games WHERE id = ?");
     $stmt->execute([$game_id]);
     $passes = intval($stmt->fetchColumn());
-    if ($passes >= 2) {
+    if ($passes >= SCORELESS_TURNS_TO_END) {
         applyEndScores($pdo, $game_id, $logic);
         $stmt = $pdo->prepare("SELECT user_id, score FROM game_players WHERE game_id = ? ORDER BY score DESC");
         $stmt->execute([$game_id]);
@@ -590,9 +609,7 @@ if ($action === 'invite') {
         json_error('Accès refusé', 403);
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM games WHERE id = ?");
-    $stmt->execute([$game_id]);
-    $game = $stmt->fetch();
+    $game = refreshGameForAction($pdo, $game_id);
 
     if ($game['status'] !== 'active') {
         json_error('Partie terminée', 400);
@@ -613,7 +630,7 @@ if ($action === 'invite') {
     $stmt = $pdo->prepare("SELECT consecutive_passes FROM games WHERE id = ?");
     $stmt->execute([$game_id]);
     $passes = intval($stmt->fetchColumn());
-    if ($passes >= 2) {
+    if ($passes >= SCORELESS_TURNS_TO_END) {
         applyEndScores($pdo, $game_id, $logic);
         $stmt = $pdo->prepare("SELECT user_id, score FROM game_players WHERE game_id = ? ORDER BY score DESC");
         $stmt->execute([$game_id]);
@@ -636,9 +653,7 @@ if ($action === 'invite') {
         json_error('Accès refusé', 403);
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM games WHERE id = ?");
-    $stmt->execute([$game_id]);
-    $game = $stmt->fetch();
+    $game = refreshGameForAction($pdo, $game_id);
 
     if ($game['status'] !== 'active') {
         json_error('Partie terminée', 400);
@@ -653,7 +668,7 @@ if ($action === 'invite') {
     echo json_encode(['success' => true]);
 
 } elseif ($action === 'save_placements') {
-    // BUG #1 Fix: Save temporary placements to session
+    require_csrf();
     $input = json_decode(file_get_contents('php://input'), true);
     $game_id = intval($input['game_id'] ?? 0);
     $placements = $input['placements'] ?? [];
@@ -666,7 +681,7 @@ if ($action === 'invite') {
         $_SESSION['game_placements'] = [];
     }
     
-    $_SESSION['game_placements'][$game_id] = $placements;
+    $_SESSION['game_placements'][$game_id] = normalizePlacementDrafts($placements);
     echo json_encode(['success' => true]);
 
 } elseif ($action === 'load_placements') {
@@ -704,5 +719,3 @@ if ($duration > 1000) {
     ]);
 }
 ?>
-
-
