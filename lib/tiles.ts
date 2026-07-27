@@ -1,5 +1,2 @@
-import { randomUUID } from 'node:crypto';
-import type { Tile } from './types';
-export const LETTERS:Record<string,{count:number;points:number}>={A:{count:9,points:1},B:{count:2,points:3},C:{count:2,points:3},D:{count:3,points:2},E:{count:15,points:1},F:{count:2,points:4},G:{count:2,points:2},H:{count:2,points:4},I:{count:8,points:1},J:{count:1,points:8},K:{count:1,points:10},L:{count:5,points:1},M:{count:3,points:2},N:{count:6,points:1},O:{count:6,points:1},P:{count:2,points:3},Q:{count:1,points:8},R:{count:6,points:1},S:{count:6,points:1},T:{count:6,points:1},U:{count:6,points:1},V:{count:2,points:4},W:{count:1,points:10},X:{count:1,points:10},Y:{count:1,points:10},Z:{count:1,points:10},'*':{count:2,points:0}};
-export function createBag():Tile[]{const bag=Object.entries(LETTERS).flatMap(([letter,info])=>Array.from({length:info.count},()=>({id:randomUUID(),letter,points:info.points})));for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];}return bag;}
-export function draw(bag:Tile[],count:number){const copy=[...bag];const cut=Math.max(0,copy.length-count);return{bag:copy.slice(0,cut),tiles:copy.slice(cut)};}
+export * from '@/domain/scrabble/tiles';
+export { LETTER_VALUES as LETTERS } from '@/domain/scrabble/tiles';

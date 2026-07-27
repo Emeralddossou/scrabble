@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added - Security (Phase 1)
+
 - Enhanced password policy (minimum 10 characters with complexity requirements)
 - Account lockout mechanism after 5 failed login attempts (30-minute lock)
 - Session timeout reduced from 7 days to 2 hours
@@ -16,12 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session regeneration on successful login
 
 ### Added - Testing (Phase 2.1)
+
 - Unit tests for GameLogic class (GameLogicTest.php)
 - PHPUnit integration in GitHub Actions workflow
 - Integration tests for complete game flows (IntegrationTest.php)
 - Security validation tests for password policies and lockout mechanisms
 
 ### Added - Accessibility (Phase 2.2)
+
 - ARIA labels on all form inputs and interactive elements
 - aria-live regions for dynamic content updates
 - Skip links for keyboard navigation
@@ -30,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Semantic HTML structure improvements
 
 ### Added - Performance (Phase 2.3 & 2.4)
+
 - Dictionary caching with APCu to reduce loading time
 - Structured logging with rotation (30-day retention)
 - Metrics tracking (total requests, errors, API calls, response time)
@@ -37,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced monitoring capabilities in Logger class
 
 ### Added - Features (Phase 3)
+
 - Word suggestion system based on current rack
 - Basic AI player for solo mode (easy/medium/hard difficulties)
 - User profile enhancements (bio, avatar, wins/losses tracking)
@@ -44,18 +49,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Game scoring optimization with dedicated calculation method
 
 ### Added - Documentation (Phase 3.5)
+
 - Comprehensive API documentation (docs/API.md)
 - Security validation report (docs/SECURITY.md)
 - Updated README with all new features
 - Database schema documentation
 
 ### Changed - Deployment (Phase 4.1)
+
 - Attempted migration from FTP to SSH (reverted - SSH not available on server)
 - Kept FTP deployment with improved error handling
 - Added FTP secrets validation in GitHub Actions workflow
 - Deployment skips gracefully if FTP secrets are not configured
 
 ### Changed - UI/UX (Phase 2.3)
+
 - Improved responsive design for mobile devices
 - Enhanced board sizing on small screens
 - Optimized tile sizes for touch interactions
@@ -63,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved game hints visibility on mobile
 
 ### Fixed - Bugs (Phase 1)
+
 - Fixed unprofessional error message ("priez" → professional message)
 - Fixed inefficient dictionary loading (added caching)
 - Fixed potential race conditions in database operations
@@ -70,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed weak password policy (added complexity requirements)
 
 ### Database Schema Changes
+
 - Added `login_attempts` table for security tracking
 - Added `bio` column to users table
 - Added `avatar` column to users table
@@ -77,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `losses` column to users table
 
 ### API Changes
+
 - Added `update_profile` endpoint to auth API
 - Added `get_suggestions` endpoint to suggestions API
 - Enhanced password validation in register, change_password, and reset_password endpoints
@@ -84,16 +95,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated all password-related error messages
 
 ### Dependencies
+
 - Added PHPUnit for testing
 - Added APCu requirement for dictionary caching
 
 ### Configuration
+
 - Updated session timeout configuration
 - Added password complexity requirements
 - Updated .env.example with new SSH deployment variables
 - Removed FTP deployment variables from .env.example
 
 ### CI/CD
+
 - Added PHPUnit execution in GitHub Actions
 - Updated deployment workflow to use SSH instead of FTP
 - Added test database setup for automated testing
@@ -102,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - Previous Release
 
 ### Added
+
 - Multiplayer Scrabble game
 - Timer mode support
 - Solo mode
@@ -113,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Responsive design
 
 ### Known Issues
+
 - Message d'erreur non professionnel dans game.php
 - Politique de mot de passe faible (8 caractères minimum)
 - Pas de verrouillage de compte
