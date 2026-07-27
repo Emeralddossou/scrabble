@@ -2,9 +2,16 @@ import { randomUUID } from 'node:crypto';
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import type { Tile } from '@/domain/scrabble/types';
 import { getDb, resetDbSingletonForTests, type Database, type Row } from '@/server/db';
 import { migrate } from '@/server/db/migrations';
-import { acceptInvitation, createGame, gameAction, gameState } from '@/server/game/service';
+import {
+  acceptInvitation,
+  createGame,
+  gameAction,
+  gameState,
+  playMove,
+} from '@/server/game/service';
 
 const configuredDialect = process.env.DB_TYPE ?? 'sqlite';
 const configuredUrl = process.env.DATABASE_URL;
@@ -95,6 +102,59 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
         (player) => Number(player.time_remaining) === 0,
       ),
     ).toBe(true);
+  });
+
+  it('valide, score et persiste une vraie pose avant de changer le tour', async () => {
+    const alice = await createUser('Alice');
+    const bob = await createUser('Bob');
+    const gameId = await createGame({
+      userId: alice,
+      opponentId: bob,
+      mode: 'free',
+      timeLimitMinutes: 15,
+      incrementSeconds: 0,
+    });
+    const rack: Tile[] = [
+      { id: randomUUID(), letter: 'E', points: 1 },
+      { id: randomUUID(), letter: 'T', points: 1 },
+      { id: randomUUID(), letter: 'A', points: 1 },
+      { id: randomUUID(), letter: 'I', points: 1 },
+      { id: randomUUID(), letter: 'N', points: 1 },
+      { id: randomUUID(), letter: 'R', points: 1 },
+      { id: randomUUID(), letter: 'S', points: 1 },
+    ];
+    await database.execute('UPDATE game_players SET rack=? WHERE game_id=? AND user_id=?', [
+      JSON.stringify(rack),
+      gameId,
+      alice,
+    ]);
+
+    const response = await playMove({
+      gameId,
+      userId: alice,
+      expectedVersion: 1,
+      actionId: randomUUID(),
+      placements: [
+        { row: 7, col: 7, tileId: rack[0].id, letter: 'E' },
+        { row: 7, col: 8, tileId: rack[1].id, letter: 'T' },
+      ],
+    });
+
+    expect(response.score).toBe(4);
+    const state = await gameState(gameId, alice);
+    expect(Number(state.current_player_id)).toBe(bob);
+    expect(Number(state.version)).toBe(2);
+    const board = state.board as Array<Array<Tile | null>>;
+    expect(board[7][7]?.letter).toBe('E');
+    expect(board[7][8]?.letter).toBe('T');
+    const aliceState = (state.players as Array<Record<string, unknown>>).find(
+      (player) => Number(player.user_id) === alice,
+    );
+    expect(Number(aliceState?.score)).toBe(4);
+    expect((state.moves as Array<{ kind: string; points: number }>)[0]).toMatchObject({
+      kind: 'play',
+      points: 4,
+    });
   });
 
   it('ajoute l’incrément au joueur après son tour chronométré', async () => {
