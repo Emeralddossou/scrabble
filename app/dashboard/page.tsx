@@ -82,8 +82,8 @@ export default function Dashboard() {
         timeLimit,
         increment,
       });
-      setError('Invitation envoyée.');
       await load();
+      setError('Invitation envoyée.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'L’invitation a échoué.');
     } finally {
@@ -139,7 +139,9 @@ export default function Dashboard() {
                 className="game-row"
                 key={game.id}
                 onClick={() =>
-                  router.push(game.status === 'finished' ? `/replay/${game.id}` : `/game/${game.id}`)
+                  router.push(
+                    game.status === 'finished' ? `/replay/${game.id}` : `/game/${game.id}`,
+                  )
                 }
               >
                 <span>
