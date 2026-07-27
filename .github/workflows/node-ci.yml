@@ -41,15 +41,36 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Apply Prettier on branch
+      - name: Apply final timer and formatting patch
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
         run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('server/game/service.ts')
+          source = path.read_text()
+          source = source.replace('turn_started_at: string;', 'turn_started_at: string | Date;')
+          old = "  const elapsed = Math.max(0, Math.floor((now - new Date(game.turn_started_at).getTime()) / 1000));"
+          new = """  const rawStartedAt = game.turn_started_at;
+            const startedAt =
+              rawStartedAt instanceof Date
+                ? rawStartedAt.getTime()
+                : Date.parse(
+                    /(?:Z|[+-]\\d{2}:\\d{2})$/.test(rawStartedAt)
+                      ? rawStartedAt
+                      : `${rawStartedAt.replace(' ', 'T')}Z`,
+                  );
+            const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));"""
+          if old in source:
+              source = source.replace(old, new)
+          path.write_text(source)
+          PY
           npm run format
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .
-            git commit -m "style: apply final project formatting"
+            git commit -m "fix: normalize database timestamps and formatting"
             git push
           fi
       - run: npm run format:check
