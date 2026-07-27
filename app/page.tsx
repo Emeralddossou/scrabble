@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { api } from '@/lib/client';
+import { api, clearPrivateCache } from '@/lib/client';
 
 export default function Home(): React.JSX.Element {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function Home(): React.JSX.Element {
         method: 'POST',
         body: JSON.stringify({ username: form.get('username'), password: form.get('password') }),
       });
+      clearPrivateCache();
       router.push('/dashboard');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La connexion a échoué.');
