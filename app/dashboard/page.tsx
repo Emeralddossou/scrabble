@@ -1,70 +1,120 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+
 import { cached, putCache, rpc } from '@/lib/client';
+
 type Dash = {
   user: { id: number; username: string; wins: number; losses: number; draws: number };
   games: Array<{
     id: number;
     opponent: string | null;
     mode: 'free' | 'timer';
-    status: string;
+    status: 'active' | 'finished';
     current_player_id: number;
   }>;
   online: Array<{ id: number; username: string; wins: number }>;
-  invites: Array<{ id: number; from_username: string }>;
+  invites: Array<{
+    id: number;
+    from_username: string;
+    mode: 'free' | 'timer';
+    time_limit_seconds: number;
+    increment_seconds: number;
+  }>;
   leaders: Array<{ id: number; username: string; wins: number }>;
 };
+
 export default function Dashboard() {
-  const r = useRouter(),
-    [data, setData] = useState<Dash | null>(null),
-    [error, setError] = useState('');
-  async function load() {
+  const router = useRouter();
+  const [data, setData] = useState<Dash | null>(null);
+  const [error, setError] = useState('');
+  const [inviteMode, setInviteMode] = useState<'free' | 'timer'>('free');
+  const [timeLimit, setTimeLimit] = useState(15);
+  const [increment, setIncrement] = useState(0);
+  const [busyPlayerId, setBusyPlayerId] = useState<number | null>(null);
+
+  async function load(): Promise<void> {
     try {
-      const d = await rpc<Dash>('dashboard');
-      setData(d);
-      putCache('dashboard', d);
+      const next = await rpc<Dash>('dashboard');
+      setData(next);
+      putCache('dashboard', next);
       setError('');
     } catch {
       setError('Hors connexion : dernières données affichées.');
-      setData((x) => x ?? cached('dashboard'));
+      setData((current) => current ?? cached('dashboard'));
     }
   }
+
   useEffect(() => {
-    load();
-    const id = setInterval(load, 12000);
-    return () => clearInterval(id);
+    void load();
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load();
+    }, 12000);
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('online', refresh);
+    return () => {
+      window.clearInterval(poll);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('online', refresh);
+    };
   }, []);
-  async function solo() {
-    const x = await rpc<{ gameId: number }>('createSolo', {
+
+  async function solo(): Promise<void> {
+    const result = await rpc<{ gameId: number }>('createSolo', {
       mode: 'free',
       timeLimit: 15,
       increment: 0,
     });
-    r.push(`/game/${x.gameId}`);
+    router.push(`/game/${result.gameId}`);
   }
+
+  async function invite(playerId: number): Promise<void> {
+    setBusyPlayerId(playerId);
+    setError('');
+    try {
+      await rpc('invite', {
+        toUserId: playerId,
+        mode: inviteMode,
+        timeLimit,
+        increment,
+      });
+      setError('Invitation envoyée.');
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'L’invitation a échoué.');
+    } finally {
+      setBusyPlayerId(null);
+    }
+  }
+
   if (!data) return <main className="center-screen">Préparation de la table…</main>;
+
   return (
     <main className="dashboard">
       <header>
         <div>
           <p className="eyebrow">SALON DES JOUEURS</p>
           <h1>Bonjour, {data.user.username}</h1>
-          <p>{error || 'La table est prête.'}</p>
+          <p role="status">{error || 'La table est prête.'}</p>
         </div>
         <div className="header-actions">
-          <button onClick={solo}>Partie solo</button>
+          <button onClick={() => void solo()}>Entraînement solo</button>
           <button
             className="quiet"
             onClick={async () => {
               await rpc('logout');
-              r.push('/');
+              router.push('/');
             }}
           >
             Déconnexion
           </button>
         </div>
       </header>
+
       <section className="stat-row">
         <article>
           <b>{data.user.wins}</b>
@@ -79,20 +129,32 @@ export default function Dashboard() {
           <span>Nuls</span>
         </article>
       </section>
+
       <section className="dash-grid">
         <article className="panel wide">
           <h2>Vos tables</h2>
           {data.games.length ? (
-            data.games.map((g) => (
-              <button className="game-row" key={g.id} onClick={() => r.push(`/game/${g.id}`)}>
+            data.games.map((game) => (
+              <button
+                className="game-row"
+                key={game.id}
+                onClick={() =>
+                  router.push(game.status === 'finished' ? `/replay/${game.id}` : `/game/${game.id}`)
+                }
+              >
                 <span>
-                  <b>{g.opponent || 'Entraînement solo'}</b>
+                  <b>{game.opponent || 'Entraînement solo'}</b>
                   <small>
-                    {g.mode === 'timer' ? 'Chronométrée' : 'Libre'} · {g.status}
+                    {game.mode === 'timer' ? 'Chronométrée' : 'Libre'} ·{' '}
+                    {game.status === 'finished' ? 'terminée' : 'en cours'}
                   </small>
                 </span>
                 <strong>
-                  {Number(g.current_player_id) === data.user.id ? 'À vous →' : 'Ouvrir'}
+                  {game.status === 'finished'
+                    ? 'Replay →'
+                    : Number(game.current_player_id) === data.user.id
+                      ? 'À vous →'
+                      : 'Ouvrir'}
                 </strong>
               </button>
             ))
@@ -100,19 +162,28 @@ export default function Dashboard() {
             <p className="empty">Aucune partie.</p>
           )}
         </article>
+
         <article className="panel">
-          <h2>Invitations</h2>
-          {data.invites.map((i) => (
-            <div className="invite" key={i.id}>
-              <b>{i.from_username}</b>
+          <h2>Invitations reçues</h2>
+          {data.invites.length === 0 && <p className="empty">Aucune invitation.</p>}
+          {data.invites.map((invitation) => (
+            <div className="invite" key={invitation.id}>
+              <span>
+                <b>{invitation.from_username}</b>
+                <small>
+                  {invitation.mode === 'timer'
+                    ? `${Math.floor(invitation.time_limit_seconds / 60)} min + ${invitation.increment_seconds} s`
+                    : 'Partie libre'}
+                </small>
+              </span>
               <div>
                 <button
                   onClick={async () => {
-                    const x = await rpc<{ gameId: number }>('respondInvite', {
-                      inviteId: Number(i.id),
+                    const result = await rpc<{ gameId: number }>('respondInvite', {
+                      inviteId: Number(invitation.id),
                       accept: true,
                     });
-                    r.push(`/game/${x.gameId}`);
+                    router.push(`/game/${result.gameId}`);
                   }}
                 >
                   Accepter
@@ -120,8 +191,11 @@ export default function Dashboard() {
                 <button
                   className="quiet"
                   onClick={async () => {
-                    await rpc('respondInvite', { inviteId: Number(i.id), accept: false });
-                    load();
+                    await rpc('respondInvite', {
+                      inviteId: Number(invitation.id),
+                      accept: false,
+                    });
+                    await load();
                   }}
                 >
                   Refuser
@@ -130,37 +204,71 @@ export default function Dashboard() {
             </div>
           ))}
         </article>
+
         <article className="panel">
-          <h2>Joueurs</h2>
-          {data.online.map((u) => (
-            <div className="player" key={u.id}>
+          <h2>Inviter un joueur</h2>
+          <div className="invite-settings">
+            <label>
+              Mode
+              <select
+                value={inviteMode}
+                onChange={(event) => setInviteMode(event.target.value as 'free' | 'timer')}
+              >
+                <option value="free">Libre</option>
+                <option value="timer">Chronométré</option>
+              </select>
+            </label>
+            {inviteMode === 'timer' && (
+              <>
+                <label>
+                  Minutes
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={timeLimit}
+                    onChange={(event) => setTimeLimit(Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Incrément (s)
+                  <input
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={increment}
+                    onChange={(event) => setIncrement(Number(event.target.value))}
+                  />
+                </label>
+              </>
+            )}
+          </div>
+          {data.online.length === 0 && (
+            <p className="empty">Aucun autre joueur connecté pour le moment.</p>
+          )}
+          {data.online.map((player) => (
+            <div className="player" key={player.id}>
               <span>
-                <b>{u.username}</b>
-                <small>{u.wins} victoire(s)</small>
+                <b>{player.username}</b>
+                <small>{player.wins} victoire(s)</small>
               </span>
               <button
-                onClick={async () => {
-                  await rpc('invite', {
-                    toUserId: Number(u.id),
-                    mode: 'free',
-                    timeLimit: 15,
-                    increment: 0,
-                  });
-                  load();
-                }}
+                disabled={busyPlayerId === player.id}
+                onClick={() => void invite(Number(player.id))}
               >
-                Inviter
+                {busyPlayerId === player.id ? 'Envoi…' : 'Inviter'}
               </button>
             </div>
           ))}
         </article>
+
         <article className="panel">
           <h2>Classement</h2>
-          {data.leaders.map((u, i) => (
-            <div className="rank" key={u.id}>
-              <span>{i + 1}</span>
-              <b>{u.username}</b>
-              <strong>{u.wins}</strong>
+          {data.leaders.map((player, index) => (
+            <div className="rank" key={player.id}>
+              <span>{index + 1}</span>
+              <b>{player.username}</b>
+              <strong>{player.wins}</strong>
             </div>
           ))}
         </article>
