@@ -39,6 +39,9 @@ type PlayerRow = Row & {
   turn_order: number;
 };
 type ActionResponse = Record<string, unknown>;
+type ActionTransactionResult =
+  | { timedOut: true }
+  | { timedOut: false; response: ActionResponse };
 type CreateGameInput = {
   userId: number;
   opponentId?: number;
@@ -282,13 +285,45 @@ async function finalize(
   return true;
 }
 
+async function finalizeTimedOutPlayer(
+  tx: Database,
+  game: GameRow,
+  activePlayer: PlayerRow,
+): Promise<boolean> {
+  if (
+    game.status !== 'active' ||
+    game.mode !== 'timer' ||
+    Number(game.current_player_id) !== Number(activePlayer.user_id) ||
+    currentRemaining(game, activePlayer) > 0
+  ) {
+    return false;
+  }
+
+  const opponent = (
+    await tx.query<PlayerRow>('SELECT * FROM game_players WHERE game_id=? AND user_id<>?', [
+      game.id,
+      activePlayer.user_id,
+    ])
+  )[0];
+  await tx.execute('UPDATE game_players SET time_remaining=0 WHERE game_id=? AND user_id=?', [
+    game.id,
+    activePlayer.user_id,
+  ]);
+  const finalized = await finalize(tx, game, 'timeout', undefined, Number(opponent?.user_id));
+  if (finalized) {
+    await tx.execute(
+      'INSERT INTO moves(game_id,user_id,kind,words,points,placements,snapshot) VALUES(?,?,?,?,?,?,?)',
+      [game.id, activePlayer.user_id, 'timeout', '[]', 0, '[]', game.board],
+    );
+  }
+  return finalized;
+}
+
 async function expireTimedOutGame(gameId: number): Promise<boolean> {
   const db = await getDb();
   return db.transaction(async (tx) => {
     const game = (
-      await tx.query<GameRow>(`SELECT * FROM games WHERE id=?${activeLockSql(tx.dialect)}`, [
-        gameId,
-      ])
+      await tx.query<GameRow>(`SELECT * FROM games WHERE id=?${activeLockSql(tx.dialect)}`, [gameId])
     )[0];
     if (!game || game.status !== 'active' || game.mode !== 'timer') return false;
 
@@ -298,40 +333,20 @@ async function expireTimedOutGame(gameId: number): Promise<boolean> {
         [game.id, game.current_player_id],
       )
     )[0];
-    if (!activePlayer || currentRemaining(game, activePlayer) > 0) return false;
-
-    const opponent = (
-      await tx.query<PlayerRow>('SELECT * FROM game_players WHERE game_id=? AND user_id<>?', [
-        game.id,
-        activePlayer.user_id,
-      ])
-    )[0];
-    await tx.execute('UPDATE game_players SET time_remaining=0 WHERE game_id=? AND user_id=?', [
-      game.id,
-      activePlayer.user_id,
-    ]);
-    const finalized = await finalize(tx, game, 'timeout', undefined, Number(opponent?.user_id));
-    if (finalized) {
-      await tx.execute(
-        'INSERT INTO moves(game_id,user_id,kind,words,points,placements,snapshot) VALUES(?,?,?,?,?,?,?)',
-        [game.id, activePlayer.user_id, 'timeout', '[]', 0, '[]', game.board],
-      );
-    }
-    return finalized;
+    return activePlayer ? finalizeTimedOutPlayer(tx, game, activePlayer) : false;
   });
 }
 
-async function assertActionable(
-  game: GameRow,
-  player: PlayerRow,
-  expectedVersion: number,
-): Promise<void> {
+function assertActiveTurn(game: GameRow, player: PlayerRow): void {
   if (game.status !== 'active') throw conflict('Cette partie est terminée.');
-  if (Number(game.version) !== expectedVersion) {
-    throw conflict('La partie a changé. Rechargez son état.');
-  }
   if (Number(game.current_player_id) !== Number(player.user_id)) {
     throw conflict('Ce n’est pas votre tour.');
+  }
+}
+
+function assertExpectedVersion(game: GameRow, expectedVersion: number): void {
+  if (Number(game.version) !== expectedVersion) {
+    throw conflict('La partie a changé. Rechargez son état.');
   }
 }
 
@@ -374,11 +389,14 @@ export async function playMove(input: {
 }): Promise<ActionResponse> {
   await expireTimedOutGame(input.gameId);
   const db = await getDb();
-  const response = await db.transaction(async (tx) => {
+  const outcome = await db.transaction<ActionTransactionResult>(async (tx) => {
     const previous = await priorAction(tx, input.gameId, input.userId, input.actionId);
-    if (previous) return previous;
+    if (previous) return { timedOut: false, response: previous };
     const { game, player } = await gameAndPlayer(tx, input.gameId, input.userId);
-    await assertActionable(game, player, input.expectedVersion);
+    assertActiveTurn(game, player);
+    if (await finalizeTimedOutPlayer(tx, game, player)) return { timedOut: true };
+    assertExpectedVersion(game, input.expectedVersion);
+
     const rack = parse<Tile[]>(player.rack);
     const result = validateAndScore(
       parse<Board>(game.board),
@@ -424,12 +442,13 @@ export async function playMove(input: {
       await finalize(tx, game, 'scoreless');
     }
 
-    const resultPayload = { score: result.score, words: result.words };
-    await persistAction(tx, game.id, input.userId, input.actionId, resultPayload);
-    return resultPayload;
+    const response = { score: result.score, words: result.words };
+    await persistAction(tx, game.id, input.userId, input.actionId, response);
+    return { timedOut: false, response };
   });
+  if (outcome.timedOut) throw conflict('Votre temps est écoulé.');
   await maybePlayAi(input.gameId);
-  return response;
+  return outcome.response;
 }
 
 export async function gameAction(input: {
@@ -442,11 +461,14 @@ export async function gameAction(input: {
 }): Promise<ActionResponse> {
   await expireTimedOutGame(input.gameId);
   const db = await getDb();
-  const response = await db.transaction(async (tx) => {
+  const outcome = await db.transaction<ActionTransactionResult>(async (tx) => {
     const previous = await priorAction(tx, input.gameId, input.userId, input.actionId);
-    if (previous) return previous;
+    if (previous) return { timedOut: false, response: previous };
     const { game, player } = await gameAndPlayer(tx, input.gameId, input.userId);
-    await assertActionable(game, player, input.expectedVersion);
+    assertActiveTurn(game, player);
+    if (await finalizeTimedOutPlayer(tx, game, player)) return { timedOut: true };
+    assertExpectedVersion(game, input.expectedVersion);
+
     const opponent = (
       await tx.query<PlayerRow>('SELECT * FROM game_players WHERE game_id=? AND user_id<>?', [
         game.id,
@@ -466,8 +488,11 @@ export async function gameAction(input: {
         const ids = new Set(input.tileIds);
         const removed = rack.filter((tile) => ids.has(tile.id));
         const bag = parse<Tile[]>(game.bag);
-        if (removed.length === 0 || removed.length !== ids.size || bag.length < removed.length) {
-          throw validationError('Cet échange est impossible.');
+        if (removed.length === 0 || removed.length !== ids.size) {
+          throw validationError('Sélection de lettres invalide.');
+        }
+        if (bag.length < 7) {
+          throw validationError('Il faut au moins sept lettres dans la pioche pour échanger.');
         }
         const drawResult = draw(bag, removed.length);
         await tx.execute('UPDATE game_players SET rack=? WHERE game_id=? AND user_id=?', [
@@ -489,12 +514,13 @@ export async function gameAction(input: {
       if (scoreless >= 6) await finalize(tx, game, 'scoreless');
     }
 
-    const payload = { accepted: true };
-    await persistAction(tx, game.id, input.userId, input.actionId, payload);
-    return payload;
+    const response = { accepted: true };
+    await persistAction(tx, game.id, input.userId, input.actionId, response);
+    return { timedOut: false, response };
   });
+  if (outcome.timedOut) throw conflict('Votre temps est écoulé.');
   if (input.kind !== 'resign') await maybePlayAi(input.gameId);
-  return response;
+  return outcome.response;
 }
 
 export async function gameState(gameId: number, userId: number): Promise<Record<string, unknown>> {
@@ -512,7 +538,13 @@ export async function gameState(gameId: number, userId: number): Promise<Record<
     'UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?',
     [userId],
   );
-  if (!presence.affectedRows) await db.execute('INSERT INTO presence(user_id) VALUES(?)', [userId]);
+  if (!presence.affectedRows) {
+    try {
+      await db.execute('INSERT INTO presence(user_id) VALUES(?)', [userId]);
+    } catch {
+      await db.execute('UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?', [userId]);
+    }
+  }
 
   const moves = await db.query<Row & { words: string; placements: string }>(
     `SELECT m.*,u.username FROM moves m LEFT JOIN users u ON u.id=m.user_id WHERE m.game_id=? ORDER BY m.id`,
