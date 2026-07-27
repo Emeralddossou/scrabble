@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation';
 
 import { cached, putCache, rpc } from '@/lib/client';
 
+type InvitationSummary = {
+  id: number;
+  mode: 'free' | 'timer';
+  time_limit_seconds: number;
+  increment_seconds: number;
+};
+
 type Dash = {
   user: { id: number; username: string; wins: number; losses: number; draws: number };
   games: Array<{
@@ -15,15 +22,16 @@ type Dash = {
     current_player_id: number;
   }>;
   online: Array<{ id: number; username: string; wins: number }>;
-  invites: Array<{
-    id: number;
-    from_username: string;
-    mode: 'free' | 'timer';
-    time_limit_seconds: number;
-    increment_seconds: number;
-  }>;
+  invites: Array<InvitationSummary & { from_username: string }>;
+  sentInvites: Array<InvitationSummary & { to_username: string }>;
   leaders: Array<{ id: number; username: string; wins: number }>;
 };
+
+function invitationLabel(invitation: InvitationSummary): string {
+  return invitation.mode === 'timer'
+    ? `${Math.floor(invitation.time_limit_seconds / 60)} min + ${invitation.increment_seconds} s`
+    : 'Partie libre, sans limite de temps';
+}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -167,16 +175,12 @@ export default function Dashboard() {
 
         <article className="panel">
           <h2>Invitations reçues</h2>
-          {data.invites.length === 0 && <p className="empty">Aucune invitation.</p>}
+          {data.invites.length === 0 && <p className="empty">Aucune invitation reçue.</p>}
           {data.invites.map((invitation) => (
             <div className="invite" key={invitation.id}>
               <span>
                 <b>{invitation.from_username}</b>
-                <small>
-                  {invitation.mode === 'timer'
-                    ? `${Math.floor(invitation.time_limit_seconds / 60)} min + ${invitation.increment_seconds} s`
-                    : 'Partie libre'}
-                </small>
+                <small>{invitationLabel(invitation)}</small>
               </span>
               <div>
                 <button
@@ -205,6 +209,26 @@ export default function Dashboard() {
               </div>
             </div>
           ))}
+
+          <h3>Invitations envoyées</h3>
+          {data.sentInvites.length === 0 && <p className="empty">Aucune invitation en attente.</p>}
+          {data.sentInvites.map((invitation) => (
+            <div className="invite" key={invitation.id}>
+              <span>
+                <b>{invitation.to_username}</b>
+                <small>{invitationLabel(invitation)}</small>
+              </span>
+              <button
+                className="quiet"
+                onClick={async () => {
+                  await rpc('cancelInvite', { inviteId: Number(invitation.id) });
+                  await load();
+                }}
+              >
+                Annuler
+              </button>
+            </div>
+          ))}
         </article>
 
         <article className="panel">
@@ -216,14 +240,14 @@ export default function Dashboard() {
                 value={inviteMode}
                 onChange={(event) => setInviteMode(event.target.value as 'free' | 'timer')}
               >
-                <option value="free">Libre</option>
+                <option value="free">Libre, durée illimitée</option>
                 <option value="timer">Chronométré</option>
               </select>
             </label>
             {inviteMode === 'timer' && (
               <>
                 <label>
-                  Minutes
+                  Minutes par joueur
                   <input
                     type="number"
                     min={1}
@@ -233,7 +257,7 @@ export default function Dashboard() {
                   />
                 </label>
                 <label>
-                  Incrément (s)
+                  Incrément par coup (s)
                   <input
                     type="number"
                     min={0}
