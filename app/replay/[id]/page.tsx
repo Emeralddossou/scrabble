@@ -3,9 +3,9 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { api } from '@/lib/client';
 import { multiplierAt } from '@/domain/scrabble/board';
 import type { Board, Tile, WordScore } from '@/domain/scrabble/types';
+import { api } from '@/lib/client';
 
 type ReplayMove = {
   id: number;
@@ -24,6 +24,10 @@ type ReplayState = {
   end_reason: string | null;
 };
 
+function emptyReplayBoard(): Board {
+  return Array.from({ length: 15 }, () => Array<Tile | null>(15).fill(null));
+}
+
 export default function ReplayPage({
   params,
 }: {
@@ -34,9 +38,11 @@ export default function ReplayPage({
   const [state, setState] = useState<ReplayState | null>(null);
   const [index, setIndex] = useState(-1);
   const [playing, setPlaying] = useState(false);
+
   useEffect(() => {
     void api<ReplayState>(`/api/games/${gameId}`).then(setState);
   }, [gameId]);
+
   useEffect(() => {
     if (!playing || !state) return undefined;
     const timer = window.setInterval(
@@ -48,16 +54,24 @@ export default function ReplayPage({
     );
     return () => window.clearInterval(timer);
   }, [playing, state]);
+
   const board = useMemo(() => {
     if (!state) return null;
-    const move = state.moves[index];
-    return move?.snapshot
-      ? (JSON.parse(move.snapshot) as Board)
-      : index < 0
-        ? Array.from({ length: 15 }, () => Array<Tile | null>(15).fill(null))
-        : state.board;
+    if (index < 0) return emptyReplayBoard();
+    for (let moveIndex = index; moveIndex >= 0; moveIndex -= 1) {
+      const snapshot = state.moves[moveIndex]?.snapshot;
+      if (snapshot) return JSON.parse(snapshot) as Board;
+    }
+    return emptyReplayBoard();
   }, [index, state]);
+
   if (!state || !board) return <main className="center-screen">Chargement du replay…</main>;
+
+  const selectedMove = index >= 0 ? state.moves[index] : null;
+  const winner = state.players.find(
+    (player) => Number(player.user_id) === Number(state.winner_id),
+  );
+
   return (
     <main className="game-shell">
       <header className="game-top">
@@ -67,7 +81,9 @@ export default function ReplayPage({
         <h1>Replay</h1>
         <span>
           {state.status === 'finished'
-            ? `Fin : ${state.end_reason ?? 'terminée'}`
+            ? winner
+              ? `${winner.username} · ${state.end_reason ?? 'partie terminée'}`
+              : `Partie nulle · ${state.end_reason ?? 'partie terminée'}`
             : 'Partie en cours'}
         </span>
       </header>
@@ -97,6 +113,14 @@ export default function ReplayPage({
             <p>
               {index + 1} / {state.moves.length}
             </p>
+            {selectedMove && (
+              <p className="notice">
+                {selectedMove.username ?? 'Système'} · {selectedMove.kind}
+                {selectedMove.words.length > 0
+                  ? ` · ${selectedMove.words.map((word) => word.word).join(', ')}`
+                  : ''}
+              </p>
+            )}
             <div className="game-buttons">
               <button onClick={() => setIndex(-1)}>Début</button>
               <button
@@ -125,7 +149,7 @@ export default function ReplayPage({
                     {move.kind} {move.words.map((word) => word.word).join(', ')}
                   </small>
                 </span>
-                <strong>+{move.points}</strong>
+                <strong>{move.points > 0 ? `+${move.points}` : '—'}</strong>
               </button>
             ))}
           </section>
