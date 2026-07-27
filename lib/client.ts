@@ -81,6 +81,11 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
       method: 'PATCH',
       body: JSON.stringify({ action: payload.accept ? 'accept' : 'decline' }),
     });
+  if (action === 'cancelInvite')
+    return api<T>(`/api/invitations/${payload.inviteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'cancel' }),
+    });
   if (action === 'play')
     return api<T>(`/api/games/${payload.gameId}/moves`, {
       method: 'POST',
