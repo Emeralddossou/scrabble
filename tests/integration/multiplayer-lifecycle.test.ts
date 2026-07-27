@@ -72,6 +72,32 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
     expect(savedInvitation.active_key).toBeNull();
   });
 
+  it('laisse une partie libre active sans limite de temps', async () => {
+    const alice = await createUser('Alice');
+    const bob = await createUser('Bob');
+    const gameId = await createGame({
+      userId: alice,
+      opponentId: bob,
+      mode: 'free',
+      timeLimitMinutes: 1,
+      incrementSeconds: 0,
+    });
+    await database.execute(
+      "UPDATE games SET turn_started_at='2000-01-01 00:00:00' WHERE id=?",
+      [gameId],
+    );
+
+    const state = await gameState(gameId, bob);
+    expect(state.status).toBe('active');
+    expect(state.mode).toBe('free');
+    expect(state.winner_id).toBeNull();
+    expect(
+      (state.players as Array<{ time_remaining: number }>).every(
+        (player) => Number(player.time_remaining) === 0,
+      ),
+    ).toBe(true);
+  });
+
   it('termine une partie chronométrée au prochain rafraîchissement et attribue la victoire', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
