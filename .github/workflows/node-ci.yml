@@ -1,18 +1,60 @@
-name: Node CI
+name: Verify
+
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, agent/**]
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: scrabble_test
+          MYSQL_USER: scrabble
+          MYSQL_PASSWORD: scrabble
+          MYSQL_ROOT_PASSWORD: root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      AUTH_SECRET: ci-random-key-material-that-is-long-enough-123456789
+      APP_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm install
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:unit
+      - run: npm run test:integration
+        env:
+          DB_TYPE: sqlite
+          DATABASE_URL: 'file::memory:'
+      - run: npm run db:migrate && npm run test:integration
+        env:
+          DB_TYPE: mysql
+          DATABASE_URL: mysql://scrabble:scrabble@127.0.0.1:3306/scrabble_test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/

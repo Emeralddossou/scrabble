@@ -1,0 +1,484 @@
+import { randomUUID } from 'node:crypto';
+
+import { emptyBoard, validateAndScore } from '@/domain/scrabble/rules';
+import { createBag, draw, rackValue } from '@/domain/scrabble/tiles';
+import type {
+  Board,
+  GameMode,
+  MoveKind,
+  Placement,
+  Tile,
+  WordScore,
+} from '@/domain/scrabble/types';
+import { getDb, type Database, type Row } from '@/server/db';
+import { getDictionary } from '@/server/game/dictionary';
+import { suggestMoves } from '@/server/game/suggestions';
+import { conflict, forbidden, validationError } from '@/server/security/errors';
+
+type GameRow = Row & {
+  id: number;
+  status: string;
+  mode: GameMode;
+  is_solo: number;
+  current_player_id: number;
+  time_limit_seconds: number;
+  increment_seconds: number;
+  board: string;
+  bag: string;
+  version: number;
+  consecutive_scoreless: number;
+  turn_started_at: string;
+  ai_level: string | null;
+};
+type PlayerRow = Row & {
+  game_id: number;
+  user_id: number;
+  rack: string;
+  score: number;
+  time_remaining: number;
+  turn_order: number;
+};
+type ActionResponse = Record<string, unknown>;
+
+const parse = <T>(value: unknown): T =>
+  typeof value === 'string' ? (JSON.parse(value) as T) : (value as T);
+const json = (value: unknown): string => JSON.stringify(value);
+
+function activeLockSql(dialect: Database['dialect']): string {
+  return dialect === 'mysql' ? ' FOR UPDATE' : '';
+}
+
+function currentRemaining(game: GameRow, player: PlayerRow, now = Date.now()): number {
+  if (game.mode !== 'timer' || Number(game.current_player_id) !== Number(player.user_id))
+    return Number(player.time_remaining);
+  const elapsed = Math.max(0, Math.floor((now - new Date(game.turn_started_at).getTime()) / 1000));
+  return Math.max(0, Number(player.time_remaining) - elapsed);
+}
+
+async function ensureBot(tx: Database, level: string): Promise<number> {
+  const username = `LexiBot-${level}`;
+  const existing = (await tx.query<Row>('SELECT id FROM users WHERE username=?', [username]))[0];
+  if (existing) return Number(existing.id);
+  const created = await tx.execute('INSERT INTO users(username,password_hash,bio) VALUES(?,?,?)', [
+    username,
+    'disabled-ai-account',
+    'Joueur automatique de LexiForge.',
+  ]);
+  return created.insertId;
+}
+
+export async function createGame(input: {
+  userId: number;
+  opponentId?: number;
+  mode: GameMode;
+  timeLimitMinutes: number;
+  incrementSeconds: number;
+  aiLevel?: 'easy' | 'medium' | 'hard';
+}): Promise<number> {
+  const db = await getDb();
+  return db.transaction(async (tx) => {
+    const opponentId = input.aiLevel ? await ensureBot(tx, input.aiLevel) : input.opponentId;
+    if (!opponentId) throw validationError('Un adversaire est requis.');
+    let bag = createBag();
+    const first = draw(bag, 7);
+    bag = first.bag;
+    const second = draw(bag, 7);
+    bag = second.bag;
+    const seconds = input.mode === 'timer' ? input.timeLimitMinutes * 60 : 0;
+    const game = await tx.execute(
+      `INSERT INTO games(status,mode,is_solo,ai_level,current_player_id,time_limit_seconds,increment_seconds,board,bag)
+       VALUES('active',?,?,?,?,?,?,?,?)`,
+      [
+        input.mode,
+        input.aiLevel ? 1 : 0,
+        input.aiLevel ?? null,
+        input.userId,
+        seconds,
+        input.incrementSeconds,
+        json(emptyBoard()),
+        json(bag),
+      ],
+    );
+    await tx.execute(
+      'INSERT INTO game_players(game_id,user_id,rack,score,time_remaining,turn_order) VALUES(?,?,?,?,?,?)',
+      [game.insertId, input.userId, json(first.tiles), 0, seconds, 1],
+    );
+    await tx.execute(
+      'INSERT INTO game_players(game_id,user_id,rack,score,time_remaining,turn_order) VALUES(?,?,?,?,?,?)',
+      [game.insertId, opponentId, json(second.tiles), 0, seconds, 2],
+    );
+    return game.insertId;
+  });
+}
+
+async function gameAndPlayer(
+  tx: Database,
+  gameId: number,
+  userId: number,
+): Promise<{ game: GameRow; player: PlayerRow }> {
+  const game = (
+    await tx.query<GameRow>(`SELECT * FROM games WHERE id=?${activeLockSql(tx.dialect)}`, [gameId])
+  )[0];
+  if (!game) throw validationError('Partie introuvable.');
+  const player = (
+    await tx.query<PlayerRow>(
+      `SELECT * FROM game_players WHERE game_id=? AND user_id=?${activeLockSql(tx.dialect)}`,
+      [gameId, userId],
+    )
+  )[0];
+  if (!player) throw forbidden('Vous ne participez pas à cette partie.');
+  return { game, player };
+}
+
+async function persistAction(
+  tx: Database,
+  gameId: number,
+  userId: number,
+  actionId: string,
+  response: ActionResponse,
+): Promise<void> {
+  await tx.execute('INSERT INTO game_actions(game_id,user_id,action_id,response) VALUES(?,?,?,?)', [
+    gameId,
+    userId,
+    actionId,
+    json(response),
+  ]);
+}
+
+async function priorAction(
+  tx: Database,
+  gameId: number,
+  userId: number,
+  actionId: string,
+): Promise<ActionResponse | null> {
+  const action = (
+    await tx.query<Row>(
+      'SELECT response FROM game_actions WHERE game_id=? AND user_id=? AND action_id=?',
+      [gameId, userId, actionId],
+    )
+  )[0];
+  return action ? parse<ActionResponse>(action.response) : null;
+}
+
+async function finalize(
+  tx: Database,
+  game: GameRow,
+  reason: 'empty_rack' | 'scoreless' | 'resign' | 'timeout',
+  emptiedUserId?: number,
+  winnerHint?: number,
+): Promise<void> {
+  const changed = await tx.execute(
+    "UPDATE games SET status='finished',end_reason=?,ended_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND status='active'",
+    [reason, game.id],
+  );
+  if (changed.affectedRows !== 1) return;
+  const players = await tx.query<PlayerRow>(
+    'SELECT * FROM game_players WHERE game_id=? ORDER BY turn_order',
+    [game.id],
+  );
+  const penalties = new Map(
+    players.map((player) => [Number(player.user_id), rackValue(parse<Tile[]>(player.rack))]),
+  );
+  for (const player of players) {
+    await tx.execute('UPDATE game_players SET score=score-? WHERE game_id=? AND user_id=?', [
+      penalties.get(Number(player.user_id)) ?? 0,
+      game.id,
+      player.user_id,
+    ]);
+  }
+  if (emptiedUserId) {
+    const bonus = players
+      .filter((player) => Number(player.user_id) !== emptiedUserId)
+      .reduce((total, player) => total + (penalties.get(Number(player.user_id)) ?? 0), 0);
+    await tx.execute('UPDATE game_players SET score=score+? WHERE game_id=? AND user_id=?', [
+      bonus,
+      game.id,
+      emptiedUserId,
+    ]);
+  }
+  const ranked = await tx.query<Row>(
+    'SELECT user_id,score FROM game_players WHERE game_id=? ORDER BY score DESC',
+    [game.id],
+  );
+  const tie = ranked.length > 1 && Number(ranked[0].score) === Number(ranked[1].score);
+  const winnerId = tie ? null : (winnerHint ?? Number(ranked[0]?.user_id ?? 0));
+  await tx.execute('UPDATE games SET winner_id=? WHERE id=?', [winnerId, game.id]);
+  if (ranked.length === 2) {
+    if (tie)
+      await tx.execute('UPDATE users SET draws=draws+1 WHERE id IN (?,?)', [
+        ranked[0].user_id,
+        ranked[1].user_id,
+      ]);
+    else {
+      await tx.execute('UPDATE users SET wins=wins+1 WHERE id=?', [winnerId]);
+      await tx.execute('UPDATE users SET losses=losses+1 WHERE id<>? AND id IN (?,?)', [
+        winnerId,
+        ranked[0].user_id,
+        ranked[1].user_id,
+      ]);
+    }
+  }
+}
+
+async function assertActionable(
+  tx: Database,
+  game: GameRow,
+  player: PlayerRow,
+  expectedVersion: number,
+): Promise<void> {
+  if (game.status !== 'active') throw conflict('Cette partie est terminée.');
+  if (Number(game.version) !== expectedVersion)
+    throw conflict('La partie a changé. Rechargez son état.');
+  if (Number(game.current_player_id) !== Number(player.user_id))
+    throw conflict('Ce n’est pas votre tour.');
+  if (currentRemaining(game, player) <= 0) {
+    const opponent = (
+      await tx.query<PlayerRow>('SELECT * FROM game_players WHERE game_id=? AND user_id<>?', [
+        game.id,
+        player.user_id,
+      ])
+    )[0];
+    await finalize(tx, game, 'timeout', undefined, Number(opponent?.user_id));
+    throw conflict('Votre temps est écoulé.');
+  }
+}
+
+async function advanceTurn(
+  tx: Database,
+  game: GameRow,
+  actor: PlayerRow,
+  scoreless: number,
+): Promise<void> {
+  const opponent = (
+    await tx.query<PlayerRow>(
+      'SELECT * FROM game_players WHERE game_id=? AND user_id<>? ORDER BY turn_order',
+      [game.id, actor.user_id],
+    )
+  )[0];
+  const remaining = currentRemaining(game, actor);
+  const nextTime =
+    game.mode === 'timer'
+      ? remaining + Number(game.increment_seconds)
+      : Number(actor.time_remaining);
+  await tx.execute('UPDATE game_players SET time_remaining=? WHERE game_id=? AND user_id=?', [
+    nextTime,
+    game.id,
+    actor.user_id,
+  ]);
+  const update = await tx.execute(
+    `UPDATE games SET current_player_id=?,turn_started_at=CURRENT_TIMESTAMP,consecutive_scoreless=?,version=version+1
+     WHERE id=? AND version=? AND status='active'`,
+    [opponent?.user_id ?? actor.user_id, scoreless, game.id, game.version],
+  );
+  if (update.affectedRows !== 1) throw conflict('Une autre action a déjà modifié la partie.');
+}
+
+export async function playMove(input: {
+  gameId: number;
+  userId: number;
+  placements: Placement[];
+  expectedVersion: number;
+  actionId: string;
+}): Promise<ActionResponse> {
+  const db = await getDb();
+  const response = await db.transaction(async (tx) => {
+    const previous = await priorAction(tx, input.gameId, input.userId, input.actionId);
+    if (previous) return previous;
+    const { game, player } = await gameAndPlayer(tx, input.gameId, input.userId);
+    await assertActionable(tx, game, player, input.expectedVersion);
+    const rack = parse<Tile[]>(player.rack);
+    const result = validateAndScore(
+      parse<Board>(game.board),
+      rack,
+      input.placements,
+      await getDictionary(),
+    );
+    if (!result.valid) throw validationError(result.error);
+    const tileIds = new Set(input.placements.map((placement) => placement.tileId));
+    const remaining = rack.filter((tile) => !tileIds.has(tile.id));
+    const refill = draw(parse<Tile[]>(game.bag), 7 - remaining.length);
+    const finalRack = [...remaining, ...refill.tiles];
+    await tx.execute('UPDATE game_players SET rack=?,score=score+? WHERE game_id=? AND user_id=?', [
+      json(finalRack),
+      result.score,
+      game.id,
+      player.user_id,
+    ]);
+    await tx.execute('UPDATE games SET board=?,bag=? WHERE id=?', [
+      json(result.board),
+      json(refill.bag),
+      game.id,
+    ]);
+    await tx.execute(
+      'INSERT INTO moves(game_id,user_id,kind,words,points,placements,snapshot) VALUES(?,?,?,?,?,?,?)',
+      [
+        game.id,
+        player.user_id,
+        'play',
+        json(result.words),
+        result.score,
+        json(input.placements),
+        json(result.board),
+      ],
+    );
+    await advanceTurn(tx, game, player, 0);
+    if (refill.bag.length === 0 && finalRack.length === 0)
+      await finalize(tx, game, 'empty_rack', input.userId);
+    const resultPayload = { score: result.score, words: result.words };
+    await persistAction(tx, game.id, input.userId, input.actionId, resultPayload);
+    return resultPayload;
+  });
+  await maybePlayAi(input.gameId);
+  return response;
+}
+
+export async function gameAction(input: {
+  gameId: number;
+  userId: number;
+  kind: Exclude<MoveKind, 'play' | 'timeout' | 'end'>;
+  tileIds: string[];
+  expectedVersion: number;
+  actionId: string;
+}): Promise<ActionResponse> {
+  const db = await getDb();
+  const response = await db.transaction(async (tx) => {
+    const previous = await priorAction(tx, input.gameId, input.userId, input.actionId);
+    if (previous) return previous;
+    const { game, player } = await gameAndPlayer(tx, input.gameId, input.userId);
+    await assertActionable(tx, game, player, input.expectedVersion);
+    const opponent = (
+      await tx.query<PlayerRow>('SELECT * FROM game_players WHERE game_id=? AND user_id<>?', [
+        game.id,
+        player.user_id,
+      ])
+    )[0];
+    if (input.kind === 'resign') {
+      await tx.execute(
+        'INSERT INTO moves(game_id,user_id,kind,words,points,placements) VALUES(?,?,?,?,?,?)',
+        [game.id, player.user_id, 'resign', '[]', 0, '[]'],
+      );
+      await finalize(tx, game, 'resign', undefined, Number(opponent?.user_id));
+    } else {
+      if (input.kind === 'exchange') {
+        const rack = parse<Tile[]>(player.rack);
+        const ids = new Set(input.tileIds);
+        const removed = rack.filter((tile) => ids.has(tile.id));
+        const bag = parse<Tile[]>(game.bag);
+        if (removed.length === 0 || removed.length !== ids.size || bag.length < removed.length) {
+          throw validationError('Cet échange est impossible.');
+        }
+        const drawResult = draw(bag, removed.length);
+        await tx.execute('UPDATE game_players SET rack=? WHERE game_id=? AND user_id=?', [
+          json([...rack.filter((tile) => !ids.has(tile.id)), ...drawResult.tiles]),
+          game.id,
+          player.user_id,
+        ]);
+        await tx.execute('UPDATE games SET bag=? WHERE id=?', [
+          json([...drawResult.bag, ...removed]),
+          game.id,
+        ]);
+      }
+      await tx.execute(
+        'INSERT INTO moves(game_id,user_id,kind,words,points,placements) VALUES(?,?,?,?,?,?)',
+        [game.id, player.user_id, input.kind, '[]', 0, json(input.tileIds)],
+      );
+      await advanceTurn(tx, game, player, Number(game.consecutive_scoreless) + 1);
+      if (Number(game.consecutive_scoreless) + 1 >= 6) await finalize(tx, game, 'scoreless');
+    }
+    const payload = { accepted: true };
+    await persistAction(tx, game.id, input.userId, input.actionId, payload);
+    return payload;
+  });
+  if (input.kind !== 'resign') await maybePlayAi(input.gameId);
+  return response;
+}
+
+export async function gameState(gameId: number, userId: number): Promise<Record<string, unknown>> {
+  const db = await getDb();
+  const game = (await db.query<GameRow>('SELECT * FROM games WHERE id=?', [gameId]))[0];
+  if (!game) throw validationError('Partie introuvable.');
+  const players = await db.query<PlayerRow & { username: string }>(
+    `SELECT gp.*,u.username FROM game_players gp JOIN users u ON u.id=gp.user_id WHERE gp.game_id=? ORDER BY gp.turn_order`,
+    [gameId],
+  );
+  if (!players.some((player) => Number(player.user_id) === userId)) throw forbidden();
+  const moves = await db.query<Row & { words: string; placements: string }>(
+    `SELECT m.*,u.username FROM moves m LEFT JOIN users u ON u.id=m.user_id WHERE m.game_id=? ORDER BY m.id`,
+    [gameId],
+  );
+  return {
+    ...game,
+    board: parse<Board>(game.board),
+    bag_count: parse<Tile[]>(game.bag).length,
+    server_time: new Date().toISOString(),
+    players: players.map((player) => ({
+      ...player,
+      time_remaining: currentRemaining(game, player),
+      rack: Number(player.user_id) === userId ? parse<Tile[]>(player.rack) : undefined,
+      rack_count: parse<Tile[]>(player.rack).length,
+    })),
+    moves: moves.map((move) => ({
+      ...move,
+      words: parse<WordScore[]>(move.words),
+      placements: parse<Placement[]>(move.placements),
+    })),
+  };
+}
+
+export async function suggestionsForGame(
+  gameId: number,
+  userId: number,
+): Promise<import('./suggestions').Suggestion[]> {
+  const db = await getDb();
+  const { game, player } = await db.transaction((tx) => gameAndPlayer(tx, gameId, userId));
+  if (!Number(game.is_solo))
+    throw forbidden('Les suggestions sont réservées à l’entraînement solo.');
+  return suggestMoves(parse<Board>(game.board), parse<Tile[]>(player.rack));
+}
+
+async function maybePlayAi(gameId: number): Promise<void> {
+  const db = await getDb();
+  const game = (
+    await db.query<GameRow>("SELECT * FROM games WHERE id=? AND status='active' AND is_solo=1", [
+      gameId,
+    ])
+  )[0];
+  if (!game) return;
+  const bot = (
+    await db.query<PlayerRow>('SELECT * FROM game_players WHERE game_id=? AND user_id=?', [
+      gameId,
+      game.current_player_id,
+    ])
+  )[0];
+  if (!bot) return;
+  const name = (await db.query<Row>('SELECT username FROM users WHERE id=?', [bot.user_id]))[0]
+    ?.username;
+  if (typeof name !== 'string' || !name.startsWith('LexiBot-')) return;
+  if (currentRemaining(game, bot) <= 0) return;
+  const options = await suggestMoves(parse<Board>(game.board), parse<Tile[]>(bot.rack), 18);
+  const level = String(game.ai_level ?? 'medium');
+  const pick =
+    level === 'hard'
+      ? options[0]
+      : level === 'medium'
+        ? options[Math.min(2, options.length - 1)]
+        : options[options.length - 1];
+  const actionId = `ai-${game.id}-${game.version}-${randomUUID()}`;
+  if (pick)
+    await playMove({
+      gameId,
+      userId: Number(bot.user_id),
+      placements: pick.placements,
+      expectedVersion: Number(game.version),
+      actionId,
+    });
+  else
+    await gameAction({
+      gameId,
+      userId: Number(bot.user_id),
+      kind: 'pass',
+      tileIds: [],
+      expectedVersion: Number(game.version),
+      actionId,
+    });
+}
