@@ -36,7 +36,10 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run format:check
+      - name: Check formatting
+        run: |
+          set -o pipefail
+          npm run format:check 2>&1 | tee format-report.txt
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:unit
@@ -51,10 +54,15 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+        env:
+          APP_URL: http://127.0.0.1:3100
+          DB_TYPE: sqlite
+          DATABASE_URL: file:./data/e2e.db
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: verification-report
           path: |
+            format-report.txt
             playwright-report/
             test-results/
