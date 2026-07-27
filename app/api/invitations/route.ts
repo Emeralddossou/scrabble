@@ -32,13 +32,17 @@ export async function POST(request: NextRequest) {
     const activeKey = [user.id, value.toUserId].sort((left, right) => left - right).join(':');
     const invitationId = await db.transaction(async (tx) => {
       await tx.execute(
-        "UPDATE invitations SET status='expired',active_key=NULL WHERE active_key=? AND status='pending' AND expires_at<=CURRENT_TIMESTAMP",
-        [activeKey],
+        `UPDATE invitations SET status='expired',active_key=NULL
+         WHERE status='pending' AND expires_at<=CURRENT_TIMESTAMP
+         AND ((from_user_id=? AND to_user_id=?) OR (from_user_id=? AND to_user_id=?))`,
+        [user.id, value.toUserId, value.toUserId, user.id],
       );
       const existing = (
         await tx.query<Row>(
-          "SELECT id FROM invitations WHERE active_key=? AND status='pending' AND expires_at>CURRENT_TIMESTAMP",
-          [activeKey],
+          `SELECT id FROM invitations
+           WHERE status='pending' AND expires_at>CURRENT_TIMESTAMP
+           AND ((from_user_id=? AND to_user_id=?) OR (from_user_id=? AND to_user_id=?))`,
+          [user.id, value.toUserId, value.toUserId, user.id],
         )
       )[0];
       if (existing) throw conflict('Une invitation est déjà en attente entre ces deux joueurs.');
