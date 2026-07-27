@@ -2,6 +2,11 @@ import type { Database } from './index';
 
 type Migration = { version: number; sqlite: string[]; mysql: string[] };
 
+type DatabaseError = {
+  code?: string;
+  message?: string;
+};
+
 const sqliteId = 'INTEGER PRIMARY KEY AUTOINCREMENT';
 const mysqlId = 'BIGINT AUTO_INCREMENT PRIMARY KEY';
 
@@ -9,7 +14,7 @@ const schema = (id: string, text: string): string[] => [
   `CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
   `CREATE TABLE users (
     id ${id}, username VARCHAR(24) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL,
-    bio ${text} NOT NULL DEFAULT '', avatar VARCHAR(255), wins INTEGER NOT NULL DEFAULT 0,
+    bio VARCHAR(2000) NOT NULL DEFAULT '', avatar VARCHAR(255), wins INTEGER NOT NULL DEFAULT 0,
     losses INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -88,6 +93,34 @@ const migrations: Migration[] = [
   },
 ];
 
+function resumableStatement(statement: string, dialect: Database['dialect']): string {
+  if (statement.startsWith('CREATE TABLE ')) {
+    return statement.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ');
+  }
+  if (dialect === 'sqlite' && statement.startsWith('CREATE INDEX ')) {
+    return statement.replace('CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ');
+  }
+  return statement;
+}
+
+function isHarmlessExistingObject(error: unknown): boolean {
+  const databaseError = error as DatabaseError;
+  return (
+    databaseError.code === 'ER_TABLE_EXISTS_ERROR' ||
+    databaseError.code === 'ER_DUP_KEYNAME' ||
+    /already exists|duplicate key name/i.test(databaseError.message ?? '')
+  );
+}
+
+async function executeMigrationStatement(database: Database, statement: string): Promise<void> {
+  try {
+    await database.execute(resumableStatement(statement, database.dialect));
+  } catch (error) {
+    if (isHarmlessExistingObject(error)) return;
+    throw error;
+  }
+}
+
 export async function migrate(database: Database): Promise<number[]> {
   const applied: number[] = [];
   const hasSchema = await database.query<{ name?: string }>(
@@ -102,10 +135,13 @@ export async function migrate(database: Database): Promise<number[]> {
         ),
       )
     : new Set<number>();
+
   for (const migration of migrations) {
     if (completed.has(migration.version)) continue;
     await database.transaction(async (tx) => {
-      for (const statement of migration[database.dialect]) await tx.execute(statement);
+      for (const statement of migration[database.dialect]) {
+        await executeMigrationStatement(tx, statement);
+      }
       await tx.execute('INSERT INTO schema_migrations(version) VALUES(?)', [migration.version]);
     });
     applied.push(migration.version);
