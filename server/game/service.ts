@@ -27,7 +27,7 @@ type GameRow = Row & {
   bag: string;
   version: number;
   consecutive_scoreless: number;
-  turn_started_at: string;
+  turn_started_at: string | Date;
   ai_level: string | null;
 };
 type PlayerRow = Row & {
@@ -61,7 +61,16 @@ function currentRemaining(game: GameRow, player: PlayerRow, now = Date.now()): n
   if (game.mode !== 'timer' || Number(game.current_player_id) !== Number(player.user_id)) {
     return Number(player.time_remaining);
   }
-  const elapsed = Math.max(0, Math.floor((now - new Date(game.turn_started_at).getTime()) / 1000));
+  const rawStartedAt = game.turn_started_at;
+  const startedAt =
+    rawStartedAt instanceof Date
+      ? rawStartedAt.getTime()
+      : Date.parse(
+          /(?:Z|[+-]\d{2}:\d{2})$/.test(rawStartedAt)
+            ? rawStartedAt
+            : `${rawStartedAt.replace(' ', 'T')}Z`,
+        );
+  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));
   return Math.max(0, Number(player.time_remaining) - elapsed);
 }
 
