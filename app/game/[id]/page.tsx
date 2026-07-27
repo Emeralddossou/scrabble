@@ -100,13 +100,13 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     }
   }, [draftVersion, state]);
 
-  const me = useMemo(
-    () => state?.players.find((player) => player.rack !== undefined),
-    [state],
-  );
+  const me = useMemo(() => state?.players.find((player) => player.rack !== undefined), [state]);
   const finished = state?.status === 'finished';
   const myTurn = Boolean(
-    state && me && state.status === 'active' && Number(state.current_player_id) === Number(me.user_id),
+    state &&
+    me &&
+    state.status === 'active' &&
+    Number(state.current_player_id) === Number(me.user_id),
   );
   const canAct = myTurn && !offline;
 
@@ -122,8 +122,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     setPlacements((current) => [
       ...current.filter(
         (placement) =>
-          placement.tileId !== selected.id ||
-          (placement.row !== row && placement.col !== col),
+          placement.tileId !== selected.id || (placement.row !== row && placement.col !== col),
       ),
       {
         row,
@@ -184,9 +183,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
         version: Number(state.version),
         placements,
       });
-      setMessage(
-        `${result.words.map((word) => word.word).join(', ')} : +${result.score} points`,
-      );
+      setMessage(`${result.words.map((word) => word.word).join(', ')} : +${result.score} points`);
       clearDraft();
       await load();
     } catch (cause) {
@@ -215,9 +212,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     };
   }
 
-  const winner = state.players.find(
-    (player) => Number(player.user_id) === Number(state.winner_id),
-  );
+  const winner = state.players.find((player) => Number(player.user_id) === Number(state.winner_id));
 
   return (
     <main className="game-shell">
@@ -336,9 +331,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
               <button
                 key={tile.id}
                 disabled={used || !canAct || finished}
-                className={
-                  selected?.id === tile.id || exchangeSelected ? 'selected' : ''
-                }
+                className={selected?.id === tile.id || exchangeSelected ? 'selected' : ''}
                 onClick={() => selectRackTile(tile)}
                 aria-pressed={selected?.id === tile.id || exchangeSelected}
               >
@@ -349,7 +342,10 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
           })}
         </div>
         <div className="game-buttons">
-          <button onClick={() => void submit()} disabled={!canAct || placements.length === 0 || finished}>
+          <button
+            onClick={() => void submit()}
+            disabled={!canAct || placements.length === 0 || finished}
+          >
             Valider
           </button>
           <button className="quiet" onClick={clearDraft} disabled={placements.length === 0}>
@@ -380,7 +376,11 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
           <button className="quiet" onClick={() => void act('pass')} disabled={!canAct || finished}>
             Passer
           </button>
-          <button className="danger" onClick={() => void act('resign')} disabled={!canAct || finished}>
+          <button
+            className="danger"
+            onClick={() => void act('resign')}
+            disabled={!canAct || finished}
+          >
             Abandonner
           </button>
         </div>

@@ -68,9 +68,7 @@ export default function ReplayPage({
   if (!state || !board) return <main className="center-screen">Chargement du replay…</main>;
 
   const selectedMove = index >= 0 ? state.moves[index] : null;
-  const winner = state.players.find(
-    (player) => Number(player.user_id) === Number(state.winner_id),
-  );
+  const winner = state.players.find((player) => Number(player.user_id) === Number(state.winner_id));
 
   return (
     <main className="game-shell">

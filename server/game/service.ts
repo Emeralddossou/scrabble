@@ -286,7 +286,9 @@ async function expireTimedOutGame(gameId: number): Promise<boolean> {
   const db = await getDb();
   return db.transaction(async (tx) => {
     const game = (
-      await tx.query<GameRow>(`SELECT * FROM games WHERE id=?${activeLockSql(tx.dialect)}`, [gameId])
+      await tx.query<GameRow>(`SELECT * FROM games WHERE id=?${activeLockSql(tx.dialect)}`, [
+        gameId,
+      ])
     )[0];
     if (!game || game.status !== 'active' || game.mode !== 'timer') return false;
 
