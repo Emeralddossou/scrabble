@@ -98,7 +98,37 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
     ).toBe(true);
   });
 
-  it('termine une partie chronométrée au prochain rafraîchissement et attribue la victoire', async () => {
+  it('ajoute l’incrément au joueur après son tour chronométré', async () => {
+    const alice = await createUser('Alice');
+    const bob = await createUser('Bob');
+    const gameId = await createGame({
+      userId: alice,
+      opponentId: bob,
+      mode: 'timer',
+      timeLimitMinutes: 1,
+      incrementSeconds: 5,
+    });
+
+    await gameAction({
+      gameId,
+      userId: alice,
+      kind: 'pass',
+      tileIds: [],
+      expectedVersion: 1,
+      actionId: randomUUID(),
+    });
+
+    const [aliceState] = await database.query<Row>(
+      'SELECT time_remaining FROM game_players WHERE game_id=? AND user_id=?',
+      [gameId, alice],
+    );
+    const [game] = await database.query<Row>('SELECT current_player_id FROM games WHERE id=?', [gameId]);
+    expect(Number(aliceState.time_remaining)).toBeGreaterThanOrEqual(64);
+    expect(Number(aliceState.time_remaining)).toBeLessThanOrEqual(65);
+    expect(Number(game.current_player_id)).toBe(bob);
+  });
+
+  it('termine atomiquement une partie chronométrée et attribue la victoire une seule fois', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
     const gameId = await createGame({
@@ -113,7 +143,19 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
       [gameId, alice],
     );
 
+    await expect(
+      gameAction({
+        gameId,
+        userId: alice,
+        kind: 'pass',
+        tileIds: [],
+        expectedVersion: 1,
+        actionId: randomUUID(),
+      }),
+    ).rejects.toThrow();
+
     const state = await gameState(gameId, bob);
+    await gameState(gameId, bob);
     expect(state.status).toBe('finished');
     expect(Number(state.winner_id)).toBe(bob);
     expect(state.end_reason).toBe('timeout');
