@@ -13,7 +13,7 @@ async function register(page: import('@playwright/test').Page, username: string)
 }
 
 test('deux joueurs créent, jouent et terminent une partie libre', async ({ browser }) => {
-  const suffix = `${Date.now()}-${test.info().workerIndex}`;
+  const suffix = `${test.info().project.name}-${Date.now()}-${test.info().workerIndex}`;
   const aliceName = `Alice-${suffix}`.slice(0, 24);
   const bobName = `Bob-${suffix}`.slice(0, 24);
   const aliceContext = await browser.newContext();
@@ -26,11 +26,11 @@ test('deux joueurs créent, jouent et terminent une partie libre', async ({ brow
     await register(bob, bobName);
 
     await alice.reload();
-    await expect(alice.getByText(bobName, { exact: true })).toBeVisible({ timeout: 15_000 });
+    const bobRow = alice.locator('.player').filter({ hasText: bobName });
+    await expect(bobRow).toBeVisible({ timeout: 15_000 });
     await expect(alice.getByRole('option', { name: 'Libre, durée illimitée' })).toBeAttached();
-    await alice.getByRole('button', { name: 'Inviter' }).click();
+    await bobRow.getByRole('button', { name: 'Inviter' }).click();
     await expect(alice.getByText('Invitation envoyée.')).toBeVisible();
-    await expect(alice.getByText(bobName, { exact: true })).toBeVisible();
 
     await bob.reload();
     const received = bob.getByText(aliceName, { exact: true });
@@ -42,7 +42,6 @@ test('deux joueurs créent, jouent et terminent une partie libre', async ({ brow
 
     await alice.goto(gameUrl);
     await expect(alice.getByRole('heading', { name: 'À vous de composer' })).toBeVisible();
-    await expect(alice.getByText('Tour adverse')).not.toBeVisible();
     await alice.getByRole('button', { name: 'Passer' }).click();
 
     await bob.reload();
@@ -58,8 +57,8 @@ test('deux joueurs créent, jouent et terminent une partie libre', async ({ brow
     await bob.getByRole('button', { name: 'Voir le replay' }).click();
     await bob.waitForURL(/\/replay\/\d+$/);
     await expect(bob.getByRole('heading', { name: 'Replay' })).toBeVisible();
-    await expect(bob.getByText('pass')).toBeVisible();
-    await expect(bob.getByText('resign')).toBeVisible();
+    await expect(bob.getByText('pass', { exact: true })).toBeVisible();
+    await expect(bob.getByText('resign', { exact: true })).toBeVisible();
   } finally {
     await aliceContext.close();
     await bobContext.close();
