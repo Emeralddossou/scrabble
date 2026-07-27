@@ -33,10 +33,13 @@ test('deux joueurs créent, jouent et terminent une partie libre', async ({ brow
     await expect(alice.getByText('Invitation envoyée.')).toBeVisible();
 
     await bob.reload();
-    const received = bob.getByText(aliceName, { exact: true });
-    await expect(received).toBeVisible({ timeout: 15_000 });
-    await expect(bob.getByText('Partie libre, sans limite de temps')).toBeVisible();
-    await bob.getByRole('button', { name: 'Accepter' }).click();
+    const receivedPanel = bob
+      .getByRole('article')
+      .filter({ has: bob.getByRole('heading', { name: 'Invitations reçues' }) });
+    const receivedInvite = receivedPanel.locator('.invite').filter({ hasText: aliceName });
+    await expect(receivedInvite).toBeVisible({ timeout: 15_000 });
+    await expect(receivedInvite.getByText('Partie libre, sans limite de temps')).toBeVisible();
+    await receivedInvite.getByRole('button', { name: 'Accepter' }).click();
     await bob.waitForURL(/\/game\/\d+$/);
     const gameUrl = bob.url();
 
