@@ -1,0 +1,9 @@
+export type Tile = { id: string; letter: string; points: number; blank?: boolean };
+export type BoardCell = Tile | null;
+export type Board = BoardCell[][];
+export type Placement = { row: number; col: number; tileId: string; letter: string; blank?: boolean };
+export type GameMode = 'free' | 'timer';
+export type GameStatus = 'active' | 'finished';
+export type MoveKind = 'play' | 'pass' | 'exchange' | 'resign' | 'timeout' | 'end';
+export type SessionUser = { id: number; username: string };
+export type Multiplier = 'TW' | 'DW' | 'TL' | 'DL' | 'ST' | null;
