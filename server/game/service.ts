@@ -39,9 +39,7 @@ type PlayerRow = Row & {
   turn_order: number;
 };
 type ActionResponse = Record<string, unknown>;
-type ActionTransactionResult =
-  | { timedOut: true }
-  | { timedOut: false; response: ActionResponse };
+type ActionTransactionResult = { timedOut: true } | { timedOut: false; response: ActionResponse };
 type CreateGameInput = {
   userId: number;
   opponentId?: number;
@@ -323,7 +321,9 @@ async function expireTimedOutGame(gameId: number): Promise<boolean> {
   const db = await getDb();
   return db.transaction(async (tx) => {
     const game = (
-      await tx.query<GameRow>(`SELECT * FROM games WHERE id=?${activeLockSql(tx.dialect)}`, [gameId])
+      await tx.query<GameRow>(`SELECT * FROM games WHERE id=?${activeLockSql(tx.dialect)}`, [
+        gameId,
+      ])
     )[0];
     if (!game || game.status !== 'active' || game.mode !== 'timer') return false;
 

@@ -82,10 +82,9 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
       timeLimitMinutes: 1,
       incrementSeconds: 0,
     });
-    await database.execute(
-      "UPDATE games SET turn_started_at='2000-01-01 00:00:00' WHERE id=?",
-      [gameId],
-    );
+    await database.execute("UPDATE games SET turn_started_at='2000-01-01 00:00:00' WHERE id=?", [
+      gameId,
+    ]);
 
     const state = await gameState(gameId, bob);
     expect(state.status).toBe('active');
@@ -122,7 +121,9 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
       'SELECT time_remaining FROM game_players WHERE game_id=? AND user_id=?',
       [gameId, alice],
     );
-    const [game] = await database.query<Row>('SELECT current_player_id FROM games WHERE id=?', [gameId]);
+    const [game] = await database.query<Row>('SELECT current_player_id FROM games WHERE id=?', [
+      gameId,
+    ]);
     expect(Number(aliceState.time_remaining)).toBeGreaterThanOrEqual(64);
     expect(Number(aliceState.time_remaining)).toBeLessThanOrEqual(65);
     expect(Number(game.current_player_id)).toBe(bob);

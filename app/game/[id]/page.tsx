@@ -104,9 +104,9 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const finished = state?.status === 'finished';
   const myTurn = Boolean(
     state &&
-      me &&
-      state.status === 'active' &&
-      Number(state.current_player_id) === Number(me.user_id),
+    me &&
+    state.status === 'active' &&
+    Number(state.current_player_id) === Number(me.user_id),
   );
   const canAct = myTurn && !offline;
 

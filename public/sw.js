@@ -32,7 +32,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response.ok && (event.request.mode === 'navigate' || url.pathname.startsWith('/_next/'))) {
+        if (
+          response.ok &&
+          (event.request.mode === 'navigate' || url.pathname.startsWith('/_next/'))
+        ) {
           const copy = response.clone();
           void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
         }

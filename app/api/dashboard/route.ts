@@ -17,7 +17,9 @@ export async function GET() {
       try {
         await db.execute('INSERT INTO presence(user_id) VALUES(?)', [user.id]);
       } catch {
-        await db.execute('UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?', [user.id]);
+        await db.execute('UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?', [
+          user.id,
+        ]);
       }
     }
 
