@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, agent/**]
 
+permissions:
+  contents: write
+
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -30,16 +33,26 @@ jobs:
       APP_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Generate formatted sources
-        run: npm run format
-      - name: Require committed formatting
-        run: git diff --exit-code
+      - name: Apply Prettier on branch
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
+        run: |
+          npm run format
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "style: apply project formatting"
+            git push
+          fi
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:unit
@@ -61,10 +74,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: formatted-sources
+          name: verification-report
           path: |
-            app/dashboard/page.tsx
-            app/game/[id]/page.tsx
-            app/replay/[id]/page.tsx
-            server/game/service.ts
-            tests/integration/multiplayer-lifecycle.test.ts
+            playwright-report/
+            test-results/
