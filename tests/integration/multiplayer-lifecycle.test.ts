@@ -6,6 +6,8 @@ import { getDb, resetDbSingletonForTests, type Database, type Row } from '@/serv
 import { migrate } from '@/server/db/migrations';
 import { acceptInvitation, createGame, gameAction, gameState } from '@/server/game/service';
 
+const configuredDialect = process.env.DB_TYPE ?? 'sqlite';
+const configuredUrl = process.env.DATABASE_URL;
 let database: Database;
 
 async function createUser(username: string): Promise<number> {
@@ -34,8 +36,11 @@ async function clearData(): Promise<void> {
 }
 
 beforeAll(async () => {
-  process.env.DB_TYPE = 'sqlite';
-  process.env.DATABASE_URL = `file:/tmp/scrabble-multiplayer-${process.pid}-${Date.now()}.db`;
+  process.env.DB_TYPE = configuredDialect;
+  process.env.DATABASE_URL =
+    configuredDialect === 'sqlite'
+      ? `file:/tmp/scrabble-multiplayer-${process.pid}-${Date.now()}.db`
+      : configuredUrl;
   resetDbSingletonForTests();
   database = await getDb();
   await migrate(database);
@@ -43,7 +48,7 @@ beforeAll(async () => {
 
 beforeEach(clearData);
 
-describe('cycle de vie multijoueur', () => {
+describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
   it('accepte une invitation une seule fois et crée une seule partie', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
@@ -96,8 +101,8 @@ describe('cycle de vie multijoueur', () => {
     expect(state.end_reason).toBe('timeout');
 
     const users = await database.query<Row>('SELECT id,wins,losses,draws FROM users ORDER BY id');
-    expect(users.find((user) => Number(user.id) === bob)?.wins).toBe(1);
-    expect(users.find((user) => Number(user.id) === alice)?.losses).toBe(1);
+    expect(Number(users.find((user) => Number(user.id) === bob)?.wins)).toBe(1);
+    expect(Number(users.find((user) => Number(user.id) === alice)?.losses)).toBe(1);
   });
 
   it('attribue toujours la victoire à l’adversaire après un abandon, même à score égal', async () => {
@@ -127,9 +132,9 @@ describe('cycle de vie multijoueur', () => {
 
     const [winner] = await database.query<Row>('SELECT wins,draws FROM users WHERE id=?', [bob]);
     const [loser] = await database.query<Row>('SELECT losses,draws FROM users WHERE id=?', [alice]);
-    expect(winner.wins).toBe(1);
-    expect(winner.draws).toBe(0);
-    expect(loser.losses).toBe(1);
-    expect(loser.draws).toBe(0);
+    expect(Number(winner.wins)).toBe(1);
+    expect(Number(winner.draws)).toBe(0);
+    expect(Number(loser.losses)).toBe(1);
+    expect(Number(loser.draws)).toBe(0);
   });
 });
