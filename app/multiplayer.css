@@ -1,0 +1,70 @@
+select {
+  font: inherit;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #0e1512;
+  color: var(--ink);
+}
+
+.invite-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.invite-settings label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.panel h3 {
+  margin-top: 26px;
+  margin-bottom: 4px;
+  color: var(--gold);
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scoreboard div {
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.scoreboard small {
+  min-width: 3.4rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.clock-low {
+  color: var(--red);
+  font-weight: 900;
+}
+
+@media (max-width: 600px) {
+  .scoreboard {
+    gap: 4px;
+  }
+
+  .scoreboard div {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .scoreboard span {
+    max-width: 85px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .invite,
+  .player {
+    align-items: flex-start;
+  }
+}
