@@ -36,10 +36,10 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Check formatting
-        run: |
-          set -o pipefail
-          npm run format:check 2>&1 | tee format-report.txt
+      - name: Generate formatted sources
+        run: npm run format
+      - name: Require committed formatting
+        run: git diff --exit-code
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:unit
@@ -61,8 +61,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: verification-report
+          name: formatted-sources
           path: |
-            format-report.txt
-            playwright-report/
-            test-results/
+            app/dashboard/page.tsx
+            app/game/[id]/page.tsx
+            app/replay/[id]/page.tsx
+            server/game/service.ts
+            tests/integration/multiplayer-lifecycle.test.ts
