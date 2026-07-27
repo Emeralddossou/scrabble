@@ -55,15 +55,7 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
     const invitation = await database.execute(
       `INSERT INTO invitations(from_user_id,to_user_id,mode,time_limit_seconds,increment_seconds,active_key,expires_at)
        VALUES(?,?,?,?,?,?,?)`,
-      [
-        alice,
-        bob,
-        'timer',
-        900,
-        5,
-        `${alice}:${bob}`,
-        new Date(Date.now() + 60_000).toISOString(),
-      ],
+      [alice, bob, 'timer', 900, 5, `${alice}:${bob}`, new Date(Date.now() + 60_000).toISOString()],
     );
 
     const gameId = await acceptInvitation(invitation.insertId, bob);
