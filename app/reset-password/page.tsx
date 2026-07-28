@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { api } from '@/lib/client';
 
 export default function ResetPasswordPage(): React.JSX.Element {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [token, setToken] = useState(searchParams.get('token') ?? '');
+  const [token, setToken] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setToken(new URLSearchParams(window.location.search).get('token') ?? '');
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -42,9 +45,7 @@ export default function ResetPasswordPage(): React.JSX.Element {
       <section className="account-card">
         <p className="eyebrow">SÉCURITÉ DU COMPTE</p>
         <h1>Nouveau mot de passe</h1>
-        <p className="lead-small">
-          Le lien est utilisable une seule fois et expire après une heure.
-        </p>
+        <p className="lead-small">Le lien est utilisable une seule fois et expire après une heure.</p>
         {message ? (
           <>
             <p className="notice" role="status">
