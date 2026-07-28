@@ -5,9 +5,6 @@ on:
   push:
     branches: [main, agent/**]
 
-permissions:
-  contents: write
-
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -33,69 +30,12 @@ jobs:
       APP_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'push' && github.ref_name || github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Normalize solo integration
-        if: github.event_name == 'push' && github.ref_name == 'agent/solo-ai-account-features'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          service_path = Path('server/game/service.ts')
-          service = service_path.read_text()
-          helper_start = service.index('function chooseAiExchange')
-          ai_start = service.index('async function maybePlayAi')
-          helpers = r'''function chooseAiExchange(rack: Tile[], level: AiLevel): string[] {
-            const letterValue = (tile: Tile): number => {
-              if (tile.letter === '*') return 20;
-              if ('ERSAITN'.includes(tile.letter)) return 7;
-              if ('LODU'.includes(tile.letter)) return 4;
-              if ('QJKWXYZ'.includes(tile.letter)) return -5;
-              return 1;
-            };
-            const sorted = [...rack].sort((left, right) => letterValue(left) - letterValue(right));
-            const maximum = level === 'expert' ? 5 : level === 'hard' ? 4 : level === 'medium' ? 3 : 2;
-            const undesirable = sorted.filter((tile) => letterValue(tile) <= 1).slice(0, maximum);
-            return (undesirable.length ? undesirable : sorted.slice(0, Math.min(2, sorted.length))).map(
-              (tile) => tile.id,
-            );
-          }
-
-          function normalizedAiLevel(value: unknown): AiLevel {
-            return value === 'easy' || value === 'hard' || value === 'expert' ? value : 'medium';
-          }
-
-          '''
-          service_path.write_text(service[:helper_start] + helpers + service[ai_start:])
-
-          suggestions_path = Path('server/game/suggestions.ts')
-          suggestions = suggestions_path.read_text()
-          suggestions = suggestions.replace(
-              "if (level === 'expert') {",
-              "if (level === 'expert' || level === 'hard') {",
-          )
-          suggestions = suggestions.replace("  if (level === 'hard') return byScore[0];\n", "")
-          suggestions_path.write_text(suggestions)
-
-          dashboard_path = Path('app/dashboard/page.tsx')
-          dashboard = dashboard_path.read_text()
-          duplicated = "import { SoloLauncher } from '@/components/solo-launcher';\nimport { SoloLauncher } from '@/components/solo-launcher';"
-          dashboard_path.write_text(dashboard.replace(duplicated, "import { SoloLauncher } from '@/components/solo-launcher';"))
-          PY
-          npm run format
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .
-            git commit -m "fix: normalize advanced solo integration"
-            git push
-          fi
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
