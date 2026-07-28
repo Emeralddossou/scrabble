@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, test } from '@playwright/test';
 
 const initialPassword = 'Scrabble!2026';
@@ -5,9 +7,9 @@ const changedPassword = 'Changed!2026';
 const recoveredPassword = 'Recovered!2026';
 
 test('un joueur gère son profil, son mot de passe et sa récupération', async ({ page }) => {
-  const suffix = `${test.info().project.name}-${Date.now()}-${test.info().workerIndex}`;
-  const username = `Profile-${suffix}`.slice(0, 24);
-  const email = `profile-${suffix}@example.com`;
+  const unique = randomUUID().replaceAll('-', '');
+  const username = `Profile-${unique.slice(0, 16)}`;
+  const email = `profile-${unique}@example.com`;
 
   await page.goto('/');
   await page.getByRole('tab', { name: 'Créer un compte' }).click();
