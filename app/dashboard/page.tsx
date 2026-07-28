@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { SoloLauncher } from '@/components/solo-launcher';
+import { SoloLauncher } from '@/components/solo-launcher';
 import { cached, putCache, rpc } from '@/lib/client';
 
 type InvitationSummary = {
