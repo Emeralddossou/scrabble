@@ -14,7 +14,24 @@ Le parcours multijoueur prend en charge :
 - la reprise après une coupure réseau sans rejouer automatiquement une action ;
 - la fin de partie, les statistiques et le replay.
 
-Le mode solo reste disponible à titre d’entraînement, mais son IA n’est pas considérée comme finalisée au même niveau que le jeu à deux.
+## Jeu solo
+
+Le mode solo utilise le même moteur de validation que le multijoueur. L’IA recherche des coups sur l’ensemble du plateau, réutilise les lettres déjà posées, contrôle les mots croisés, emploie les jokers et échange ses lettres lorsqu’aucun coup n’est disponible.
+
+Quatre niveaux sont proposés :
+
+- **Découverte** : sélection volontairement imparfaite parmi les coups légaux ;
+- **Intermédiaire** : choix varié dans le groupe des bons coups ;
+- **Difficile** : priorité au score immédiat maximal ;
+- **Expert** : arbitrage entre score, qualité du chevalet restant et ouvertures offertes à l’adversaire.
+
+Les parties solo peuvent être libres ou chronométrées.
+
+## Comptes joueurs
+
+Chaque joueur dispose d’un profil avec avatar, biographie, statistiques et historique récent. L’adresse e-mail facultative sert à la récupération du compte. Le changement de mot de passe révoque toutes les sessions actives.
+
+En production, la réinitialisation utilise Resend. Configurer `RESEND_API_KEY`, `EMAIL_FROM` et `APP_URL`. Les réponses de demande restent volontairement identiques qu’un compte existe ou non afin d’empêcher l’énumération des utilisateurs.
 
 ## Démarrage
 
