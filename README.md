@@ -18,11 +18,10 @@ Le parcours multijoueur prend en charge :
 
 Le mode solo utilise le même moteur de validation que le multijoueur. L’IA recherche des coups sur l’ensemble du plateau, réutilise les lettres déjà posées, contrôle les mots croisés, emploie les jokers et échange ses lettres lorsqu’aucun coup n’est disponible.
 
-Quatre niveaux sont proposés :
+Trois niveaux réellement distincts sont proposés :
 
 - **Découverte** : sélection volontairement imparfaite parmi les coups légaux ;
 - **Intermédiaire** : choix varié dans le groupe des bons coups ;
-- **Difficile** : priorité au score immédiat maximal ;
 - **Expert** : arbitrage entre score, qualité du chevalet restant et ouvertures offertes à l’adversaire.
 
 Les parties solo peuvent être libres ou chronométrées.
