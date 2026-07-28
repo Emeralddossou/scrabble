@@ -236,12 +236,11 @@ export function chooseAiMove(
   const byScore = [...suggestions].sort(
     (left, right) => right.score - left.score || right.equity - left.equity,
   );
-  if (level === 'expert') {
+  if (level === 'expert' || level === 'hard') {
     return [...suggestions].sort(
       (left, right) => right.equity - left.equity || right.score - left.score,
     )[0];
   }
-  if (level === 'hard') return byScore[0];
   if (level === 'medium') {
     const pool = byScore.slice(0, Math.max(1, Math.ceil(byScore.length * 0.35)));
     return pool[stableIndex(seed, pool.length)];
