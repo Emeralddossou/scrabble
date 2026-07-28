@@ -47,7 +47,9 @@
   color: #302010;
   font-size: 3rem;
   font-weight: 900;
-  box-shadow: inset -5px -5px #9d743f, 0 18px 35px #0006;
+  box-shadow:
+    inset -5px -5px #9d743f,
+    0 18px 35px #0006;
 }
 
 .profile-stat-grid {

@@ -25,7 +25,9 @@ describe('moteur de suggestions solo', () => {
     expect(
       moves.some((move) =>
         move.placements.some(
-          (placement) => placement.tileId === 'rack-t' && Math.abs(placement.row - 7) + Math.abs(placement.col - 7) === 1,
+          (placement) =>
+            placement.tileId === 'rack-t' &&
+            Math.abs(placement.row - 7) + Math.abs(placement.col - 7) === 1,
         ),
       ),
     ).toBe(true);

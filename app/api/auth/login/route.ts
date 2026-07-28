@@ -8,7 +8,10 @@ import { AppError } from '@/server/security/errors';
 import { clearRateLimit, consumeRateLimit } from '@/server/security/rate-limit';
 
 export const runtime = 'nodejs';
-const input = z.object({ identifier: z.string().trim().min(1).max(320), password: z.string().min(1) });
+const input = z.object({
+  identifier: z.string().trim().min(1).max(320),
+  password: z.string().min(1),
+});
 
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();

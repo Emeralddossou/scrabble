@@ -71,7 +71,9 @@ export default function ProfilePage(): React.JSX.Element {
       });
       setMessage('Profil mis à jour.');
       setData((current) =>
-        current ? { ...current, user: { ...current.user, bio, email: email || null, avatar } } : current,
+        current
+          ? { ...current, user: { ...current.user, bio, email: email || null, avatar } }
+          : current,
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La mise à jour a échoué.');
@@ -120,21 +122,40 @@ export default function ProfilePage(): React.JSX.Element {
           <h1>{data.user.username}</h1>
           <p>Membre depuis le {new Date(data.user.created_at).toLocaleDateString('fr-FR')}</p>
         </div>
-        <button className="quiet" onClick={() => router.push('/dashboard')}>← Retour au salon</button>
+        <button className="quiet" onClick={() => router.push('/dashboard')}>
+          ← Retour au salon
+        </button>
       </header>
 
       <section className="profile-hero">
-        <div className="avatar-preview" aria-label={`Avatar ${avatar}`}>{AVATARS[avatar] ?? AVATARS.tile}</div>
+        <div className="avatar-preview" aria-label={`Avatar ${avatar}`}>
+          {AVATARS[avatar] ?? AVATARS.tile}
+        </div>
         <div className="profile-stat-grid">
-          <article><b>{data.user.wins}</b><span>Victoires</span></article>
-          <article><b>{data.user.losses}</b><span>Défaites</span></article>
-          <article><b>{data.user.draws}</b><span>Nuls</span></article>
-          <article><b>{played}</b><span>Parties</span></article>
+          <article>
+            <b>{data.user.wins}</b>
+            <span>Victoires</span>
+          </article>
+          <article>
+            <b>{data.user.losses}</b>
+            <span>Défaites</span>
+          </article>
+          <article>
+            <b>{data.user.draws}</b>
+            <span>Nuls</span>
+          </article>
+          <article>
+            <b>{played}</b>
+            <span>Parties</span>
+          </article>
         </div>
       </section>
 
       {(message || error) && (
-        <p className={error ? 'error account-feedback' : 'notice account-feedback'} role={error ? 'alert' : 'status'}>
+        <p
+          className={error ? 'error account-feedback' : 'notice account-feedback'}
+          role={error ? 'alert' : 'status'}
+        >
           {error || message}
         </p>
       )}
@@ -147,7 +168,9 @@ export default function ProfilePage(): React.JSX.Element {
               Avatar
               <select value={avatar} onChange={(event) => setAvatar(event.target.value)}>
                 {Object.entries(AVATARS).map(([value, symbol]) => (
-                  <option key={value} value={value}>{symbol} {value}</option>
+                  <option key={value} value={value}>
+                    {symbol} {value}
+                  </option>
                 ))}
               </select>
             </label>
@@ -182,39 +205,76 @@ export default function ProfilePage(): React.JSX.Element {
           <form className="form-grid" onSubmit={changePassword}>
             <label>
               Mot de passe actuel
-              <input name="currentPassword" type="password" required autoComplete="current-password" />
+              <input
+                name="currentPassword"
+                type="password"
+                required
+                autoComplete="current-password"
+              />
             </label>
             <label>
               Nouveau mot de passe
-              <input name="nextPassword" type="password" minLength={10} required autoComplete="new-password" />
+              <input
+                name="nextPassword"
+                type="password"
+                minLength={10}
+                required
+                autoComplete="new-password"
+              />
             </label>
             <label>
               Confirmer
-              <input name="confirmation" type="password" minLength={10} required autoComplete="new-password" />
+              <input
+                name="confirmation"
+                type="password"
+                minLength={10}
+                required
+                autoComplete="new-password"
+              />
             </label>
             <small>Majuscule, minuscule, chiffre et symbole obligatoires.</small>
-            <button className="danger" disabled={busy}>Modifier et déconnecter</button>
+            <button className="danger" disabled={busy}>
+              Modifier et déconnecter
+            </button>
           </form>
         </article>
 
         <article className="account-card wide-card">
           <h2>Historique récent</h2>
-          {data.games.length === 0 ? <p className="empty">Aucune partie enregistrée.</p> : (
+          {data.games.length === 0 ? (
+            <p className="empty">Aucune partie enregistrée.</p>
+          ) : (
             <div className="profile-history-list">
               {data.games.map((game) => {
-                const won = game.status === 'finished' && Number(game.winner_id) === Number(data.user.id);
+                const won =
+                  game.status === 'finished' && Number(game.winner_id) === Number(data.user.id);
                 const draw = game.status === 'finished' && game.winner_id === null;
                 return (
                   <button
                     key={game.id}
                     className="history-row"
-                    onClick={() => router.push(game.status === 'finished' ? `/replay/${game.id}` : `/game/${game.id}`)}
+                    onClick={() =>
+                      router.push(
+                        game.status === 'finished' ? `/replay/${game.id}` : `/game/${game.id}`,
+                      )
+                    }
                   >
                     <span>
                       <b>{game.is_solo ? `IA ${game.ai_level ?? 'medium'}` : game.opponent}</b>
-                      <small>{game.mode === 'timer' ? 'Chronométrée' : 'Libre'} · {new Date(game.created_at).toLocaleDateString('fr-FR')}</small>
+                      <small>
+                        {game.mode === 'timer' ? 'Chronométrée' : 'Libre'} ·{' '}
+                        {new Date(game.created_at).toLocaleDateString('fr-FR')}
+                      </small>
                     </span>
-                    <strong>{game.status === 'active' ? 'En cours' : draw ? 'Nul' : won ? 'Victoire' : 'Défaite'}</strong>
+                    <strong>
+                      {game.status === 'active'
+                        ? 'En cours'
+                        : draw
+                          ? 'Nul'
+                          : won
+                            ? 'Victoire'
+                            : 'Défaite'}
+                    </strong>
                   </button>
                 );
               })}

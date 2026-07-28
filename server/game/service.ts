@@ -12,7 +12,7 @@ import type {
 } from '@/domain/scrabble/types';
 import { getDb, type Database, type Row } from '@/server/db';
 import { getDictionary } from '@/server/game/dictionary';
-import { suggestMoves } from '@/server/game/suggestions';
+import { chooseAiMove, suggestMoves, type AiLevel } from '@/server/game/suggestions';
 import { conflict, forbidden, validationError } from '@/server/security/errors';
 
 type GameRow = Row & {
@@ -46,7 +46,7 @@ type CreateGameInput = {
   mode: GameMode;
   timeLimitMinutes: number;
   incrementSeconds: number;
-  aiLevel?: 'easy' | 'medium' | 'hard';
+  aiLevel?: AiLevel;
 };
 
 const parse = <T>(value: unknown): T =>
@@ -590,6 +590,26 @@ export async function suggestionsForGame(
   return suggestMoves(parse<Board>(game.board), parse<Tile[]>(player.rack));
 }
 
+function chooseAiExchange(rack: Tile[], level: AiLevel): string[] {
+  const letterValue = (tile: Tile): number => {
+    if (tile.letter === '*') return 20;
+    if ('ERSAITN'.includes(tile.letter)) return 7;
+    if ('LODU'.includes(tile.letter)) return 4;
+    if ('QJKWXYZ'.includes(tile.letter)) return -5;
+    return 1;
+  };
+  const sorted = [...rack].sort((left, right) => letterValue(left) - letterValue(right));
+  const maximum = level === 'expert' ? 5 : level === 'hard' ? 4 : level === 'medium' ? 3 : 2;
+  const undesirable = sorted.filter((tile) => letterValue(tile) <= 1).slice(0, maximum);
+  return (undesirable.length ? undesirable : sorted.slice(0, Math.min(2, sorted.length))).map(
+    (tile) => tile.id,
+  );
+}
+
+function normalizedAiLevel(value: unknown): AiLevel {
+  return value === 'easy' || value === 'hard' || value === 'expert' ? value : 'medium';
+}
+
 async function maybePlayAi(gameId: number): Promise<void> {
   const db = await getDb();
   const game = (
@@ -609,15 +629,14 @@ async function maybePlayAi(gameId: number): Promise<void> {
     ?.username;
   if (typeof name !== 'string' || !name.startsWith('LexiBot-')) return;
   if (currentRemaining(game, bot) <= 0) return;
-  const options = await suggestMoves(parse<Board>(game.board), parse<Tile[]>(bot.rack), 18);
-  const level = String(game.ai_level ?? 'medium');
-  const pick =
-    level === 'hard'
-      ? options[0]
-      : level === 'medium'
-        ? options[Math.min(2, options.length - 1)]
-        : options[options.length - 1];
+
+  const level = normalizedAiLevel(game.ai_level);
+  const rack = parse<Tile[]>(bot.rack);
+  const budget =
+    level === 'expert' ? 1800 : level === 'hard' ? 1400 : level === 'medium' ? 1000 : 700;
+  const options = await suggestMoves(parse<Board>(game.board), rack, 48, budget);
   const actionId = `ai-${game.id}-${game.version}-${randomUUID()}`;
+  const pick = chooseAiMove(options, level, `${game.id}:${game.version}:${bot.user_id}`);
   if (pick) {
     await playMove({
       gameId,
@@ -626,14 +645,17 @@ async function maybePlayAi(gameId: number): Promise<void> {
       expectedVersion: Number(game.version),
       actionId,
     });
-  } else {
-    await gameAction({
-      gameId,
-      userId: Number(bot.user_id),
-      kind: 'pass',
-      tileIds: [],
-      expectedVersion: Number(game.version),
-      actionId,
-    });
+    return;
   }
+
+  const bag = parse<Tile[]>(game.bag);
+  const exchangeIds = bag.length >= 7 ? chooseAiExchange(rack, level) : [];
+  await gameAction({
+    gameId,
+    userId: Number(bot.user_id),
+    kind: exchangeIds.length ? 'exchange' : 'pass',
+    tileIds: exchangeIds,
+    expectedVersion: Number(game.version),
+    actionId,
+  });
 }

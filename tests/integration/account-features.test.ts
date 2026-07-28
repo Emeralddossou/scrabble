@@ -70,10 +70,11 @@ describe(`fonctions de compte (${configuredDialect})`, () => {
       'INSERT INTO users(username,email,password_hash) VALUES(?,?,?)',
       ['Recoverable', 'recover@example.com', await hashPassword('Initial!2026')],
     );
-    await database.execute(
-      'INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)',
-      [created.insertId, 'test-session-token', new Date(Date.now() + 60_000).toISOString()],
-    );
+    await database.execute('INSERT INTO sessions(user_id,token_hash,expires_at) VALUES(?,?,?)', [
+      created.insertId,
+      'test-session-token',
+      new Date(Date.now() + 60_000).toISOString(),
+    ]);
 
     const token = await issuePasswordReset('Recoverable');
     expect(token).toBeTruthy();
@@ -84,7 +85,9 @@ describe(`fonctions de compte (${configuredDialect})`, () => {
     expect(await verifyPassword('ResetDone!2026', String(user.password_hash))).toBe(true);
 
     await changePassword(created.insertId, 'ResetDone!2026', 'FinalPass!2026');
-    [user] = await database.query<Row>('SELECT password_hash FROM users WHERE id=?', [created.insertId]);
+    [user] = await database.query<Row>('SELECT password_hash FROM users WHERE id=?', [
+      created.insertId,
+    ]);
     expect(await verifyPassword('FinalPass!2026', String(user.password_hash))).toBe(true);
     const [session] = await database.query<Row>('SELECT revoked_at FROM sessions WHERE user_id=?', [
       created.insertId,

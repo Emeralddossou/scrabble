@@ -8,7 +8,11 @@ import { rpc } from '@/lib/client';
 import type { AiLevel } from '@/server/game/suggestions';
 
 const LEVELS: Array<{ value: AiLevel; label: string; description: string }> = [
-  { value: 'easy', label: 'Découverte', description: 'Coups simples et volontairement imparfaits.' },
+  {
+    value: 'easy',
+    label: 'Découverte',
+    description: 'Coups simples et volontairement imparfaits.',
+  },
   { value: 'medium', label: 'Intermédiaire', description: 'Bon équilibre entre score et variété.' },
   { value: 'hard', label: 'Difficile', description: 'Recherche les meilleurs scores disponibles.' },
   {
@@ -49,7 +53,11 @@ export function SoloLauncher(): React.JSX.Element {
     <>
       <button onClick={() => setOpen(true)}>Jouer contre l’IA</button>
       {open && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => !busy && setOpen(false)}>
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={() => !busy && setOpen(false)}
+        >
           <section
             className="game-modal"
             role="dialog"
@@ -76,7 +84,10 @@ export function SoloLauncher(): React.JSX.Element {
             <div className="form-grid compact">
               <label>
                 Mode de jeu
-                <select value={mode} onChange={(event) => setMode(event.target.value as 'free' | 'timer')}>
+                <select
+                  value={mode}
+                  onChange={(event) => setMode(event.target.value as 'free' | 'timer')}
+                >
                   <option value="free">Libre, durée illimitée</option>
                   <option value="timer">Chronométré</option>
                 </select>
@@ -106,7 +117,11 @@ export function SoloLauncher(): React.JSX.Element {
                 </>
               )}
             </div>
-            {error && <p className="error" role="alert">{error}</p>}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
             <div className="modal-actions">
               <button disabled={busy} onClick={() => void create()}>
                 {busy ? 'Préparation…' : 'Commencer la partie'}

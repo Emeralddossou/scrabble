@@ -145,7 +145,12 @@ async function wordsMatching(slot: Slot): Promise<readonly string[]> {
   return matches;
 }
 
-function placementsForSlot(word: string, rack: Tile[], board: Board, slot: Slot): Placement[] | null {
+function placementsForSlot(
+  word: string,
+  rack: Tile[],
+  board: Board,
+  slot: Slot,
+): Placement[] | null {
   const available = [...rack];
   const placements: Placement[] = [];
 
@@ -185,7 +190,10 @@ function leaveValue(rack: Tile[], placements: Placement[]): number {
     return score;
   }, 0);
   const balance = leave.length <= 1 ? 0 : Math.abs(vowels - consonants) * 0.7;
-  const duplicates = Object.values(counts).reduce((penalty, count) => penalty + Math.max(0, count - 2), 0);
+  const duplicates = Object.values(counts).reduce(
+    (penalty, count) => penalty + Math.max(0, count - 2),
+    0,
+  );
   const qWithoutU = counts.Q && !counts.U ? 3 : 0;
   return useful - balance - duplicates - qWithoutU;
 }
@@ -271,7 +279,8 @@ export async function suggestMoves(
         .join('|');
       if (seen.has(moveKey)) continue;
       seen.add(moveKey);
-      const equity = result.score + leaveValue(rack, placements) - exposurePenalty(board, placements);
+      const equity =
+        result.score + leaveValue(rack, placements) - exposurePenalty(board, placements);
       suggestions.push({
         word: result.words.map((entry) => entry.word).join(', '),
         row: slot.row,

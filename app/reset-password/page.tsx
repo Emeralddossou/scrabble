@@ -42,10 +42,14 @@ export default function ResetPasswordPage(): React.JSX.Element {
       <section className="account-card">
         <p className="eyebrow">SÉCURITÉ DU COMPTE</p>
         <h1>Nouveau mot de passe</h1>
-        <p className="lead-small">Le lien est utilisable une seule fois et expire après une heure.</p>
+        <p className="lead-small">
+          Le lien est utilisable une seule fois et expire après une heure.
+        </p>
         {message ? (
           <>
-            <p className="notice" role="status">{message}</p>
+            <p className="notice" role="status">
+              {message}
+            </p>
             <button onClick={() => router.push('/')}>Retour à la connexion</button>
           </>
         ) : (
@@ -56,17 +60,35 @@ export default function ResetPasswordPage(): React.JSX.Element {
             </label>
             <label>
               Nouveau mot de passe
-              <input name="password" type="password" minLength={10} required autoComplete="new-password" />
+              <input
+                name="password"
+                type="password"
+                minLength={10}
+                required
+                autoComplete="new-password"
+              />
             </label>
             <label>
               Confirmer le mot de passe
-              <input name="confirmation" type="password" minLength={10} required autoComplete="new-password" />
+              <input
+                name="confirmation"
+                type="password"
+                minLength={10}
+                required
+                autoComplete="new-password"
+              />
             </label>
             <small>10 caractères minimum, avec majuscule, minuscule, chiffre et symbole.</small>
-            {error && <p className="error" role="alert">{error}</p>}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
             <div className="account-actions">
               <button disabled={busy}>{busy ? 'Modification…' : 'Modifier le mot de passe'}</button>
-              <button type="button" className="quiet" onClick={() => router.push('/')}>Annuler</button>
+              <button type="button" className="quiet" onClick={() => router.push('/')}>
+                Annuler
+              </button>
             </div>
           </form>
         )}

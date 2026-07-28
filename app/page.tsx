@@ -66,18 +66,29 @@ export default function Home(): React.JSX.Element {
 
   return (
     <main className="landing">
-      <a className="skip-link" href="#authentication">Aller à la connexion</a>
+      <a className="skip-link" href="#authentication">
+        Aller à la connexion
+      </a>
       <section className="hero">
-        <div className="tile-logo"><b>L</b><i>1</i></div>
+        <div className="tile-logo">
+          <b>L</b>
+          <i>1</i>
+        </div>
         <p className="eyebrow">ARÈNE LEXICALE FRANCOPHONE</p>
-        <h1>Les mots deviennent<br /><em>des coups de maître.</em></h1>
+        <h1>
+          Les mots deviennent
+          <br />
+          <em>des coups de maître.</em>
+        </h1>
         <p className="lead">
           Un Scrabble français tactique, jouable sur tous les écrans et prêt à reprendre après une
           coupure réseau.
         </p>
       </section>
       <section id="authentication" className="auth-panel" aria-labelledby="auth-title">
-        <h2 id="auth-title" className="sr-only">Authentification</h2>
+        <h2 id="auth-title" className="sr-only">
+          Authentification
+        </h2>
         {mode !== 'reset' ? (
           <div className="tabs" role="tablist">
             <button
@@ -117,7 +128,13 @@ export default function Home(): React.JSX.Element {
             <>
               <label>
                 Nom de joueur
-                <input name="username" required minLength={3} maxLength={24} autoComplete="username" />
+                <input
+                  name="username"
+                  required
+                  minLength={3}
+                  maxLength={24}
+                  autoComplete="username"
+                />
               </label>
               <label>
                 E-mail de récupération
@@ -146,7 +163,11 @@ export default function Home(): React.JSX.Element {
           {mode === 'register' && (
             <small>10 caractères, majuscule, minuscule, chiffre et symbole.</small>
           )}
-          {message && <p className="notice" role="status">{message}</p>}
+          {message && (
+            <p className="notice" role="status">
+              {message}
+            </p>
+          )}
           {debugToken && (
             <button
               type="button"
@@ -156,7 +177,11 @@ export default function Home(): React.JSX.Element {
               Ouvrir le lien de test
             </button>
           )}
-          {error && <p className="error" role="alert">{error}</p>}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
           <button className="cta" disabled={busy}>
             {busy
               ? 'Patientez…'
