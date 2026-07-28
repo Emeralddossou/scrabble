@@ -610,6 +610,26 @@ function normalizedAiLevel(value: unknown): AiLevel {
   return value === 'easy' || value === 'hard' || value === 'expert' ? value : 'medium';
 }
 
+function chooseAiExchange(rack: Tile[], level: AiLevel): string[] {
+  const letterValue = (tile: Tile): number => {
+    if (tile.letter === '*') return 20;
+    if ('ERSAITN'.includes(tile.letter)) return 7;
+    if ('LODU'.includes(tile.letter)) return 4;
+    if ('QJKWXYZ'.includes(tile.letter)) return -5;
+    return 1;
+  };
+  const sorted = [...rack].sort((left, right) => letterValue(left) - letterValue(right));
+  const maximum = level === 'expert' ? 5 : level === 'hard' ? 4 : level === 'medium' ? 3 : 2;
+  const undesirable = sorted.filter((tile) => letterValue(tile) <= 1).slice(0, maximum);
+  return (undesirable.length ? undesirable : sorted.slice(0, Math.min(2, sorted.length))).map(
+    (tile) => tile.id,
+  );
+}
+
+function normalizedAiLevel(value: unknown): AiLevel {
+  return value === 'easy' || value === 'hard' || value === 'expert' ? value : 'medium';
+}
+
 async function maybePlayAi(gameId: number): Promise<void> {
   const db = await getDb();
   const game = (
