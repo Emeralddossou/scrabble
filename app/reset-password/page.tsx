@@ -45,7 +45,9 @@ export default function ResetPasswordPage(): React.JSX.Element {
       <section className="account-card">
         <p className="eyebrow">SÉCURITÉ DU COMPTE</p>
         <h1>Nouveau mot de passe</h1>
-        <p className="lead-small">Le lien est utilisable une seule fois et expire après une heure.</p>
+        <p className="lead-small">
+          Le lien est utilisable une seule fois et expire après une heure.
+        </p>
         {message ? (
           <>
             <p className="notice" role="status">

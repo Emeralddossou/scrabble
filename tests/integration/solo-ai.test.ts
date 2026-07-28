@@ -71,7 +71,9 @@ describe(`cycle solo avec IA (${configuredDialect})`, () => {
     expect(moves.some((move) => move.username === 'LexiBot-hard')).toBe(true);
     expect(moves.some((move) => ['play', 'exchange', 'pass'].includes(move.kind))).toBe(true);
 
-    const [game] = await database.query<Row>('SELECT ai_level,is_solo FROM games WHERE id=?', [gameId]);
+    const [game] = await database.query<Row>('SELECT ai_level,is_solo FROM games WHERE id=?', [
+      gameId,
+    ]);
     expect(game.ai_level).toBe('hard');
     expect(Number(game.is_solo)).toBe(1);
   });
