@@ -16,7 +16,7 @@
 | Replay                        | `replay.php`             | implémenté      | journal, snapshots et plateau stable pendant les passages, échanges, abandons et expirations                                       | parcours Playwright                                 |
 | Résilience réseau             | JavaScript historique    | implémentée     | dernier état local lisible hors connexion, mutations jamais rejouées automatiquement, API privée exclue du cache du service worker | revue de sécurité et build PWA                      |
 | MySQL / SQLite                | SQLite historique        | implémentés     | même service métier avec migrations versionnées et tests d’intégration sur les deux moteurs                                        | GitHub Actions                                      |
-| IA solo et suggestions        | `backend/AIPlayer.php`   | implémentées    | recherche ancrée sur tout le plateau, mots croisés, jokers, échange automatique et quatre stratégies de difficulté                 | `tests/unit/suggestions.test.ts` et parcours solo   |
+| IA solo et suggestions        | `backend/AIPlayer.php`   | implémentées    | recherche ancrée sur tout le plateau, mots croisés, jokers, échange automatique et trois stratégies de difficulté                  | `tests/unit/suggestions.test.ts` et parcours solo   |
 | Migration des données         | schéma `backend/db.php`  | import JSON     | import transactionnel avec rapport et mode dry-run                                                                                 | intégration migration                               |
 
 La nouvelle passe couvre désormais les fonctions historiques de compte et le jeu solo, en complément du jeu à deux déjà fiabilisé.
