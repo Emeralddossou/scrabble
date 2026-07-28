@@ -628,7 +628,7 @@ async function maybePlayAi(gameId: number): Promise<void> {
   const name = (await db.query<Row>('SELECT username FROM users WHERE id=?', [bot.user_id]))[0]
     ?.username;
   if (typeof name !== 'string' || !name.startsWith('LexiBot-')) return;
-  if (currentRemaining(game, bot) <= 0) return;
+  if (game.mode === 'timer' && currentRemaining(game, bot) <= 0) return;
 
   const level = normalizedAiLevel(game.ai_level);
   const rack = parse<Tile[]>(bot.rack);
