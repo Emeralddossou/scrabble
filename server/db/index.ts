@@ -22,8 +22,9 @@ function configuredDialect(): Dialect {
 function configuredUrl(dialect: Dialect): string {
   const url = process.env.DATABASE_URL;
   if (url) return url;
-  if (process.env.NODE_ENV === 'production')
+  if (process.env.NODE_ENV === 'production') {
     throw new Error('DATABASE_URL est obligatoire en production.');
+  }
   return dialect === 'sqlite' ? 'file:./data/scrabble.db' : '';
 }
 
@@ -53,15 +54,23 @@ function sqliteDatabase(client: Client): Database {
   };
 }
 
+const ISO_UTC_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+
+function mysqlParams(params: unknown[]): unknown[] {
+  return params.map((param) =>
+    typeof param === 'string' && ISO_UTC_DATE.test(param) ? new Date(param) : param,
+  );
+}
+
 function mysqlDatabase(connection: Pool | PoolConnection): Database {
   return {
     dialect: 'mysql',
     async query<T extends Row>(sql: string, params: unknown[] = []): Promise<T[]> {
-      const [rows] = await connection.query(sql, params);
+      const [rows] = await connection.query(sql, mysqlParams(params));
       return rows as T[];
     },
     async execute(sql: string, params: unknown[] = []) {
-      const [result] = await connection.query(sql, params);
+      const [result] = await connection.query(sql, mysqlParams(params));
       const header = result as ResultSetHeader;
       return { insertId: Number(header.insertId), affectedRows: header.affectedRows };
     },
@@ -87,7 +96,14 @@ export async function createDatabase(): Promise<Database> {
   const dialect = configuredDialect();
   const url = configuredUrl(dialect);
   if (dialect === 'sqlite') return sqliteDatabase(createClient({ url }));
-  return mysqlDatabase(mysql.createPool({ uri: url, connectionLimit: 5, enableKeepAlive: true }));
+  return mysqlDatabase(
+    mysql.createPool({
+      uri: url,
+      connectionLimit: 5,
+      enableKeepAlive: true,
+      timezone: 'Z',
+    }),
+  );
 }
 
 export function getDb(): Promise<Database> {

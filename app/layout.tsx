@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { ServiceWorker } from '@/components/service-worker';
 
 import './globals.css';
+import './multiplayer.css';
 
 export const metadata: Metadata = {
   title: 'LexiForge — Scrabble français',

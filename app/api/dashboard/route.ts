@@ -3,6 +3,7 @@ import { getDb, type Row } from '@/server/db';
 import { failure, success } from '@/server/http';
 
 export const runtime = 'nodejs';
+
 export async function GET() {
   const requestId = crypto.randomUUID();
   try {
@@ -12,8 +13,21 @@ export async function GET() {
       'UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?',
       [user.id],
     );
-    if (!presence.affectedRows)
-      await db.execute('INSERT INTO presence(user_id) VALUES(?)', [user.id]);
+    if (!presence.affectedRows) {
+      try {
+        await db.execute('INSERT INTO presence(user_id) VALUES(?)', [user.id]);
+      } catch {
+        await db.execute('UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?', [
+          user.id,
+        ]);
+      }
+    }
+
+    await db.execute(
+      "UPDATE invitations SET status='expired',active_key=NULL WHERE status='pending' AND expires_at<=CURRENT_TIMESTAMP AND (from_user_id=? OR to_user_id=?)",
+      [user.id, user.id],
+    );
+
     const [me] = await db.query<Row>(
       'SELECT id,username,bio,avatar,wins,losses,draws FROM users WHERE id=?',
       [user.id],
@@ -40,10 +54,15 @@ export async function GET() {
        WHERE i.to_user_id=? AND i.status='pending' AND i.expires_at>CURRENT_TIMESTAMP ORDER BY i.created_at DESC`,
       [user.id],
     );
+    const sentInvites = await db.query<Row>(
+      `SELECT i.*,u.username AS to_username FROM invitations i JOIN users u ON u.id=i.to_user_id
+       WHERE i.from_user_id=? AND i.status='pending' AND i.expires_at>CURRENT_TIMESTAMP ORDER BY i.created_at DESC`,
+      [user.id],
+    );
     const leaders = await db.query<Row>(
       "SELECT id,username,wins,losses,draws FROM users WHERE username NOT LIKE 'LexiBot-%' ORDER BY wins DESC,draws DESC,username LIMIT 10",
     );
-    return success({ user: me, games, online, invites, leaders }, requestId);
+    return success({ user: me, games, online, invites, sentInvites, leaders }, requestId);
   } catch (error) {
     return failure(error, requestId);
   }

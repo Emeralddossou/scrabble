@@ -1,4 +1,10 @@
 import type { NextConfig } from 'next';
+
+const scriptPolicy =
+  process.env.NODE_ENV === 'production'
+    ? "script-src 'self' 'unsafe-inline'"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+
 const config: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
@@ -11,11 +17,11 @@ const config: NextConfig = {
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
         {
           key: 'Content-Security-Policy',
-          value:
-            "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+          value: `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; ${scriptPolicy}; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
         },
       ],
     },
   ],
 };
+
 export default config;

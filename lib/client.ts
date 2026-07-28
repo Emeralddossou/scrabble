@@ -51,10 +51,25 @@ export function putCache(key: string, value: unknown): void {
   }
 }
 
+export function clearPrivateCache(): void {
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (key === 'dashboard' || key?.startsWith('game:')) localStorage.removeItem(key);
+    }
+  } catch {
+    /* Storage can be unavailable in private browsing. */
+  }
+}
+
 /** Compatibility facade for existing screens; it dispatches to resource routes, never to an RPC endpoint. */
 export async function rpc<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   if (action === 'dashboard') return api<T>('/api/dashboard');
-  if (action === 'logout') return api<T>('/api/auth/logout', { method: 'POST', body: '{}' });
+  if (action === 'logout') {
+    const result = await api<T>('/api/auth/logout', { method: 'POST', body: '{}' });
+    clearPrivateCache();
+    return result;
+  }
   if (action === 'state') return api<T>(`/api/games/${payload.gameId}`);
   if (action === 'createSolo')
     return api<T>('/api/games', {
@@ -80,6 +95,11 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
     return api<T>(`/api/invitations/${payload.inviteId}`, {
       method: 'PATCH',
       body: JSON.stringify({ action: payload.accept ? 'accept' : 'decline' }),
+    });
+  if (action === 'cancelInvite')
+    return api<T>(`/api/invitations/${payload.inviteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'cancel' }),
     });
   if (action === 'play')
     return api<T>(`/api/games/${payload.gameId}/moves`, {
