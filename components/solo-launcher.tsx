@@ -5,27 +5,30 @@ import { useRouter } from 'next/navigation';
 
 import { rpc } from '@/lib/client';
 
-import type { AiLevel } from '@/server/game/suggestions';
-
-const LEVELS: Array<{ value: AiLevel; label: string; description: string }> = [
+const LEVELS = [
   {
     value: 'easy',
     label: 'Découverte',
-    description: 'Coups simples et volontairement imparfaits.',
+    description: 'Choisit des coups légaux simples et laisse volontairement des occasions.',
   },
-  { value: 'medium', label: 'Intermédiaire', description: 'Bon équilibre entre score et variété.' },
-  { value: 'hard', label: 'Difficile', description: 'Recherche les meilleurs scores disponibles.' },
   {
-    value: 'expert',
-    label: 'Expert',
-    description: 'Évalue le score, le chevalet restant et les ouvertures offertes.',
+    value: 'medium',
+    label: 'Intermédiaire',
+    description: 'Joue régulièrement de bons coups tout en conservant de la variété.',
   },
-];
+  {
+    value: 'hard',
+    label: 'Expert',
+    description: 'Optimise le score, le chevalet restant et les ouvertures du plateau.',
+  },
+] as const;
+
+type Level = (typeof LEVELS)[number]['value'];
 
 export function SoloLauncher(): React.JSX.Element {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [level, setLevel] = useState<AiLevel>('medium');
+  const [level, setLevel] = useState<Level>('medium');
   const [mode, setMode] = useState<'free' | 'timer'>('free');
   const [minutes, setMinutes] = useState(15);
   const [increment, setIncrement] = useState(0);
