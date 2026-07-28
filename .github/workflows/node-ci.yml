@@ -41,7 +41,7 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Apply solo AI and dashboard integration
+      - name: Normalize solo integration
         if: github.event_name == 'push' && github.ref_name == 'agent/solo-ai-account-features'
         run: |
           python - <<'PY'
@@ -49,16 +49,9 @@ jobs:
 
           service_path = Path('server/game/service.ts')
           service = service_path.read_text()
-          service = service.replace(
-              "import { suggestMoves } from '@/server/game/suggestions';",
-              "import { chooseAiMove, suggestMoves, type AiLevel } from '@/server/game/suggestions';",
-          )
-          service = service.replace(
-              "  aiLevel?: 'easy' | 'medium' | 'hard';",
-              "  aiLevel?: AiLevel;",
-          )
-          marker = service.index('async function maybePlayAi')
-          service = service[:marker] + r'''function chooseAiExchange(rack: Tile[], level: AiLevel): string[] {
+          helper_start = service.index('function chooseAiExchange')
+          ai_start = service.index('async function maybePlayAi')
+          helpers = r'''function chooseAiExchange(rack: Tile[], level: AiLevel): string[] {
             const letterValue = (tile: Tile): number => {
               if (tile.letter === '*') return 20;
               if ('ERSAITN'.includes(tile.letter)) return 7;
@@ -78,89 +71,29 @@ jobs:
             return value === 'easy' || value === 'hard' || value === 'expert' ? value : 'medium';
           }
 
-          async function maybePlayAi(gameId: number): Promise<void> {
-            const db = await getDb();
-            const game = (
-              await db.query<GameRow>(
-                "SELECT * FROM games WHERE id=? AND status='active' AND is_solo=1",
-                [gameId],
-              )
-            )[0];
-            if (!game) return;
-            const bot = (
-              await db.query<PlayerRow>('SELECT * FROM game_players WHERE game_id=? AND user_id=?', [
-                gameId,
-                game.current_player_id,
-              ])
-            )[0];
-            if (!bot) return;
-            const name = (await db.query<Row>('SELECT username FROM users WHERE id=?', [bot.user_id]))[0]
-              ?.username;
-            if (typeof name !== 'string' || !name.startsWith('LexiBot-')) return;
-            if (currentRemaining(game, bot) <= 0) return;
-
-            const level = normalizedAiLevel(game.ai_level);
-            const rack = parse<Tile[]>(bot.rack);
-            const budget = level === 'expert' ? 1800 : level === 'hard' ? 1400 : level === 'medium' ? 1000 : 700;
-            const options = await suggestMoves(parse<Board>(game.board), rack, 48, budget);
-            const actionId = `ai-${game.id}-${game.version}-${randomUUID()}`;
-            const pick = chooseAiMove(options, level, `${game.id}:${game.version}:${bot.user_id}`);
-            if (pick) {
-              await playMove({
-                gameId,
-                userId: Number(bot.user_id),
-                placements: pick.placements,
-                expectedVersion: Number(game.version),
-                actionId,
-              });
-              return;
-            }
-
-            const bag = parse<Tile[]>(game.bag);
-            const exchangeIds = bag.length >= 7 ? chooseAiExchange(rack, level) : [];
-            await gameAction({
-              gameId,
-              userId: Number(bot.user_id),
-              kind: exchangeIds.length ? 'exchange' : 'pass',
-              tileIds: exchangeIds,
-              expectedVersion: Number(game.version),
-              actionId,
-            });
-          }
           '''
-          service_path.write_text(service)
+          service_path.write_text(service[:helper_start] + helpers + service[ai_start:])
+
+          suggestions_path = Path('server/game/suggestions.ts')
+          suggestions = suggestions_path.read_text()
+          suggestions = suggestions.replace(
+              "if (level === 'expert') {",
+              "if (level === 'expert' || level === 'hard') {",
+          )
+          suggestions = suggestions.replace("  if (level === 'hard') return byScore[0];\n", "")
+          suggestions_path.write_text(suggestions)
 
           dashboard_path = Path('app/dashboard/page.tsx')
           dashboard = dashboard_path.read_text()
-          dashboard = dashboard.replace(
-              "import { cached, putCache, rpc } from '@/lib/client';",
-              "import { SoloLauncher } from '@/components/solo-launcher';\nimport { cached, putCache, rpc } from '@/lib/client';",
-          )
-          dashboard = dashboard.replace(
-              """  async function solo(): Promise<void> {
-              const result = await rpc<{ gameId: number }>('createSolo', {
-                mode: 'free',
-                timeLimit: 15,
-                increment: 0,
-              });
-              router.push(`/game/${result.gameId}`);
-            }
-
-          """,
-              "",
-          )
-          dashboard = dashboard.replace(
-              '<button onClick={() => void solo()}>Entraînement solo</button>',
-              "<SoloLauncher />\n          <button className=\"quiet\" onClick={() => router.push('/profile')}>Mon profil</button>",
-          )
-          dashboard_path.write_text(dashboard)
+          duplicated = "import { SoloLauncher } from '@/components/solo-launcher';\nimport { SoloLauncher } from '@/components/solo-launcher';"
+          dashboard_path.write_text(dashboard.replace(duplicated, "import { SoloLauncher } from '@/components/solo-launcher';"))
           PY
           npm run format
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .
-            git commit -m "feat: integrate advanced solo AI and account navigation"
+            git commit -m "fix: normalize advanced solo integration"
             git push
           fi
       - run: npm run format:check
