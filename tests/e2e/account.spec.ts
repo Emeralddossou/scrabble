@@ -22,7 +22,7 @@ test('un joueur gère son profil, son mot de passe et sa récupération', async 
   await page.getByRole('button', { name: 'Mon profil' }).click();
   await page.waitForURL('**/profile');
   await expect(page.getByRole('heading', { name: username })).toBeVisible();
-  await page.getByLabel('Avatar').selectOption('fox');
+  await page.getByRole('combobox', { name: 'Avatar' }).selectOption('fox');
   await page.getByLabel('Présentation').fill('Amateur de mots croisés et de parties rapides.');
   await page.getByRole('button', { name: 'Enregistrer le profil' }).click();
   await expect(page.getByText('Profil mis à jour.')).toBeVisible();
