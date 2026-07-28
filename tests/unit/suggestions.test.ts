@@ -33,12 +33,12 @@ describe('moteur de suggestions solo', () => {
     ).toBe(true);
   });
 
-  it('distingue le meilleur score du meilleur choix stratégique', () => {
+  it('réserve le meilleur choix stratégique au niveau expert', () => {
     const highestScore = suggestion('MAX', 30, 18);
     const bestEquity = suggestion('LEAVE', 26, 42);
     const options = [highestScore, bestEquity, suggestion('OTHER', 12, 11)];
 
-    expect(chooseAiMove(options, 'hard', 'seed')).toBe(highestScore);
+    expect(chooseAiMove(options, 'hard', 'seed')).toBe(bestEquity);
     expect(chooseAiMove(options, 'expert', 'seed')).toBe(bestEquity);
     expect(chooseAiMove(options, 'medium', 'seed')).toBeDefined();
     expect(chooseAiMove(options, 'easy', 'seed')).toBeDefined();
