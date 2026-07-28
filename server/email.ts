@@ -15,28 +15,33 @@ export async function sendPasswordResetEmail(
     return { delivered: false, reason: 'missing_configuration' };
   }
 
-  const resetUrl = new URL('/reset-password', appUrl);
-  resetUrl.searchParams.set('token', token);
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: sender,
-      to: [recipient],
-      subject: 'Réinitialisation de votre mot de passe LexiForge',
-      html: `<p>Bonjour ${escapeHtml(username)},</p><p>Une réinitialisation de mot de passe a été demandée pour votre compte LexiForge.</p><p><a href="${resetUrl.toString()}">Choisir un nouveau mot de passe</a></p><p>Ce lien expire dans une heure. Ignorez ce message si vous n’êtes pas à l’origine de la demande.</p>`,
-      text: `Bonjour ${username},\n\nChoisissez un nouveau mot de passe avec ce lien : ${resetUrl.toString()}\n\nCe lien expire dans une heure.`,
-    }),
-  });
+  try {
+    const resetUrl = new URL('/reset-password', appUrl);
+    resetUrl.searchParams.set('token', token);
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: sender,
+        to: [recipient],
+        subject: 'Réinitialisation de votre mot de passe LexiForge',
+        html: `<p>Bonjour ${escapeHtml(username)},</p><p>Une réinitialisation de mot de passe a été demandée pour votre compte LexiForge.</p><p><a href="${resetUrl.toString()}">Choisir un nouveau mot de passe</a></p><p>Ce lien expire dans une heure. Ignorez ce message si vous n’êtes pas à l’origine de la demande.</p>`,
+        text: `Bonjour ${username},\n\nChoisissez un nouveau mot de passe avec ce lien : ${resetUrl.toString()}\n\nCe lien expire dans une heure.`,
+      }),
+    });
 
-  if (!response.ok) {
-    console.error('Password reset email provider error', response.status, await response.text());
+    if (!response.ok) {
+      console.error('Password reset email provider error', response.status, await response.text());
+      return { delivered: false, reason: 'provider_error' };
+    }
+    return { delivered: true };
+  } catch (error) {
+    console.error('Password reset email delivery failed', error);
     return { delivered: false, reason: 'provider_error' };
   }
-  return { delivered: true };
 }
 
 function escapeHtml(value: string): string {
