@@ -91,6 +91,17 @@ const migrations: Migration[] = [
     sqlite: schema(sqliteId, 'TEXT'),
     mysql: schema(mysqlId, 'LONGTEXT'),
   },
+  {
+    version: 2,
+    sqlite: [
+      'ALTER TABLE users ADD COLUMN email VARCHAR(320)',
+      'CREATE UNIQUE INDEX users_email_unique ON users(email) WHERE email IS NOT NULL',
+    ],
+    mysql: [
+      'ALTER TABLE users ADD COLUMN email VARCHAR(320) NULL AFTER username',
+      'CREATE UNIQUE INDEX users_email_unique ON users(email)',
+    ],
+  },
 ];
 
 function resumableStatement(statement: string, dialect: Database['dialect']): string {
@@ -108,7 +119,8 @@ function isHarmlessExistingObject(error: unknown): boolean {
   return (
     databaseError.code === 'ER_TABLE_EXISTS_ERROR' ||
     databaseError.code === 'ER_DUP_KEYNAME' ||
-    /already exists|duplicate key name/i.test(databaseError.message ?? '')
+    databaseError.code === 'ER_DUP_FIELDNAME' ||
+    /already exists|duplicate key name|duplicate column name/i.test(databaseError.message ?? '')
   );
 }
 
