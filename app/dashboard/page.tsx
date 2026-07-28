@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { SoloLauncher } from '@/components/solo-launcher';
 import { cached, putCache, rpc } from '@/lib/client';
 
 type InvitationSummary = {
@@ -71,15 +72,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  async function solo(): Promise<void> {
-    const result = await rpc<{ gameId: number }>('createSolo', {
-      mode: 'free',
-      timeLimit: 15,
-      increment: 0,
-    });
-    router.push(`/game/${result.gameId}`);
-  }
-
   async function invite(playerId: number): Promise<void> {
     setBusyPlayerId(playerId);
     setError('');
@@ -110,7 +102,10 @@ export default function Dashboard() {
           <p role="status">{error || 'La table est prête.'}</p>
         </div>
         <div className="header-actions">
-          <button onClick={() => void solo()}>Entraînement solo</button>
+          <SoloLauncher />
+          <button className="quiet" onClick={() => router.push('/profile')}>
+            Mon profil
+          </button>
           <button
             className="quiet"
             onClick={async () => {

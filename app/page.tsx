@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation';
 
 import { api, clearPrivateCache } from '@/lib/client';
 
+type AuthMode = 'login' | 'register' | 'reset';
+
 export default function Home(): React.JSX.Element {
   const router = useRouter();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<AuthMode>('login');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [debugToken, setDebugToken] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -16,18 +20,48 @@ export default function Home(): React.JSX.Element {
     const form = new FormData(event.currentTarget);
     setBusy(true);
     setError('');
+    setMessage('');
+    setDebugToken('');
     try {
+      if (mode === 'reset') {
+        const result = await api<{ message: string; debugToken?: string }>(
+          '/api/auth/password-reset/request',
+          {
+            method: 'POST',
+            body: JSON.stringify({ identifier: form.get('identifier') }),
+          },
+        );
+        setMessage(result.message);
+        setDebugToken(result.debugToken ?? '');
+        return;
+      }
+
       await api(`/api/auth/${mode}`, {
         method: 'POST',
-        body: JSON.stringify({ username: form.get('username'), password: form.get('password') }),
+        body: JSON.stringify(
+          mode === 'login'
+            ? { identifier: form.get('identifier'), password: form.get('password') }
+            : {
+                username: form.get('username'),
+                email: form.get('email'),
+                password: form.get('password'),
+              },
+        ),
       });
       clearPrivateCache();
       router.push('/dashboard');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'La connexion a échoué.');
+      setError(cause instanceof Error ? cause.message : 'La demande a échoué.');
     } finally {
       setBusy(false);
     }
+  }
+
+  function selectMode(nextMode: AuthMode): void {
+    setMode(nextMode);
+    setError('');
+    setMessage('');
+    setDebugToken('');
   }
 
   return (
@@ -55,43 +89,93 @@ export default function Home(): React.JSX.Element {
         <h2 id="auth-title" className="sr-only">
           Authentification
         </h2>
-        <div className="tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'login'}
-            className={mode === 'login' ? 'active' : ''}
-            onClick={() => setMode('login')}
-          >
-            Connexion
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'register'}
-            className={mode === 'register' ? 'active' : ''}
-            onClick={() => setMode('register')}
-          >
-            Créer un compte
-          </button>
-        </div>
+        {mode !== 'reset' ? (
+          <div className="tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'login'}
+              className={mode === 'login' ? 'active' : ''}
+              onClick={() => selectMode('login')}
+            >
+              Connexion
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'register'}
+              className={mode === 'register' ? 'active' : ''}
+              onClick={() => selectMode('register')}
+            >
+              Créer un compte
+            </button>
+          </div>
+        ) : (
+          <div className="reset-heading">
+            <p className="eyebrow">RÉCUPÉRATION</p>
+            <h2>Mot de passe oublié</h2>
+          </div>
+        )}
+
         <form onSubmit={submit}>
-          <label>
-            Nom de joueur
-            <input name="username" required minLength={3} maxLength={24} autoComplete="username" />
-          </label>
-          <label>
-            Mot de passe
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={10}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            />
-          </label>
+          {mode === 'login' && (
+            <label>
+              Nom de joueur ou e-mail
+              <input name="identifier" required maxLength={320} autoComplete="username" />
+            </label>
+          )}
+          {mode === 'register' && (
+            <>
+              <label>
+                Nom de joueur
+                <input
+                  name="username"
+                  required
+                  minLength={3}
+                  maxLength={24}
+                  autoComplete="username"
+                />
+              </label>
+              <label>
+                E-mail de récupération
+                <input name="email" type="email" maxLength={320} autoComplete="email" />
+              </label>
+            </>
+          )}
+          {mode === 'reset' && (
+            <label>
+              Nom de joueur ou e-mail
+              <input name="identifier" required maxLength={320} autoComplete="username" />
+            </label>
+          )}
+          {mode !== 'reset' && (
+            <label>
+              Mot de passe
+              <input
+                name="password"
+                type="password"
+                required
+                minLength={mode === 'register' ? 10 : 1}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+            </label>
+          )}
           {mode === 'register' && (
             <small>10 caractères, majuscule, minuscule, chiffre et symbole.</small>
+          )}
+          {message && (
+            <p className="notice" role="status">
+              {message}
+            </p>
+          )}
+          {debugToken && (
+            <button
+              type="button"
+              className="quiet"
+              onClick={() => router.push(`/reset-password?token=${encodeURIComponent(debugToken)}`)}
+            >
+              Ouvrir le lien de test
+            </button>
           )}
           {error && (
             <p className="error" role="alert">
@@ -99,8 +183,24 @@ export default function Home(): React.JSX.Element {
             </p>
           )}
           <button className="cta" disabled={busy}>
-            {busy ? 'Patientez…' : mode === 'login' ? 'Entrer dans l’arène' : 'Forger mon profil'}
+            {busy
+              ? 'Patientez…'
+              : mode === 'login'
+                ? 'Entrer dans l’arène'
+                : mode === 'register'
+                  ? 'Forger mon profil'
+                  : 'Envoyer le lien sécurisé'}
           </button>
+          {mode === 'login' && (
+            <button type="button" className="quiet" onClick={() => selectMode('reset')}>
+              Mot de passe oublié ?
+            </button>
+          )}
+          {mode === 'reset' && (
+            <button type="button" className="quiet" onClick={() => selectMode('login')}>
+              Retour à la connexion
+            </button>
+          )}
         </form>
       </section>
     </main>

@@ -41,7 +41,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
       - name: Test SQLite integration
-        run: npm run test:integration
+        run: |
+          set -o pipefail
+          npm run test:integration 2>&1 | tee sqlite-integration-report.txt
         env:
           DB_TYPE: sqlite
           DATABASE_URL: 'file::memory:'
@@ -64,6 +66,7 @@ jobs:
         with:
           name: verification-report
           path: |
+            sqlite-integration-report.txt
             mysql-integration-report.txt
             playwright-report/
             test-results/

@@ -4,6 +4,7 @@ import { ServiceWorker } from '@/components/service-worker';
 
 import './globals.css';
 import './multiplayer.css';
+import './account.css';
 
 export const metadata: Metadata = {
   title: 'LexiForge — Scrabble français',

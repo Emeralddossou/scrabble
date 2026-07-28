@@ -71,17 +71,18 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
     return result;
   }
   if (action === 'state') return api<T>(`/api/games/${payload.gameId}`);
-  if (action === 'createSolo')
+  if (action === 'createSolo') {
     return api<T>('/api/games', {
       method: 'POST',
       body: JSON.stringify({
         mode: payload.mode,
         timeLimitMinutes: payload.timeLimit,
         incrementSeconds: payload.increment,
-        aiLevel: 'medium',
+        aiLevel: payload.aiLevel ?? 'medium',
       }),
     });
-  if (action === 'invite')
+  }
+  if (action === 'invite') {
     return api<T>('/api/invitations', {
       method: 'POST',
       body: JSON.stringify({
@@ -91,17 +92,20 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
         incrementSeconds: payload.increment,
       }),
     });
-  if (action === 'respondInvite')
+  }
+  if (action === 'respondInvite') {
     return api<T>(`/api/invitations/${payload.inviteId}`, {
       method: 'PATCH',
       body: JSON.stringify({ action: payload.accept ? 'accept' : 'decline' }),
     });
-  if (action === 'cancelInvite')
+  }
+  if (action === 'cancelInvite') {
     return api<T>(`/api/invitations/${payload.inviteId}`, {
       method: 'PATCH',
       body: JSON.stringify({ action: 'cancel' }),
     });
-  if (action === 'play')
+  }
+  if (action === 'play') {
     return api<T>(`/api/games/${payload.gameId}/moves`, {
       method: 'POST',
       body: JSON.stringify({
@@ -110,7 +114,8 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
         actionId: crypto.randomUUID(),
       }),
     });
-  if (action === 'gameAction')
+  }
+  if (action === 'gameAction') {
     return api<T>(`/api/games/${payload.gameId}/actions`, {
       method: 'POST',
       body: JSON.stringify({
@@ -120,5 +125,6 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
         actionId: crypto.randomUUID(),
       }),
     });
+  }
   throw new ApiClientError('UNSUPPORTED_CLIENT_ACTION', 'Action client inconnue.', 400);
 }
