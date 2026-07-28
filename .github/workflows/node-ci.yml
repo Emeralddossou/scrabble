@@ -5,9 +5,6 @@ on:
   push:
     branches: [main, agent/**]
 
-permissions:
-  contents: write
-
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -33,25 +30,12 @@ jobs:
       APP_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'push' && github.ref_name || github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Apply project formatting
-        if: github.event_name == 'push' && github.ref_name == 'agent/solo-ai-account-features'
-        run: |
-          npm run format
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .
-            git commit -m "style: format solo and account features"
-            git push
-          fi
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
