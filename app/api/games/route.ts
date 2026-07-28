@@ -11,7 +11,7 @@ const input = z.object({
   mode: z.enum(['free', 'timer']),
   timeLimitMinutes: z.number().int().min(1).max(120),
   incrementSeconds: z.number().int().min(0).max(120),
-  aiLevel: z.enum(['easy', 'medium', 'hard', 'expert']),
+  aiLevel: z.enum(['easy', 'medium', 'hard']),
 });
 
 export async function POST(request: NextRequest) {
