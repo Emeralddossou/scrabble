@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useMemo, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { multiplierAt } from '@/lib/board';
@@ -55,6 +55,13 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const [offline, setOffline] = useState(false);
   const [receivedAt, setReceivedAt] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
+  const [isDragging, setIsDragging] = useState(false);
+  const [hoverCell, setHoverCell] = useState<{ row: number; col: number } | null>(null);
+  const dragTileRef = useRef<Tile | null>(null);
+  const touchGhostRef = useRef<HTMLDivElement | null>(null);
+  const chooseRef = useRef<(row: number, col: number, tileOverride?: Tile) => void>(() => {});
+  const gameStateRef = useRef({ state: null as State | null, canAct: false, exchangeMode: false });
+  gameStateRef.current = { state, canAct, exchangeMode };
 
   const load = useCallback(async () => {
     try {
@@ -116,26 +123,30 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     setDraftVersion(null);
   }
 
-  function choose(row: number, col: number): void {
-    if (!selected || !state || !canAct || exchangeMode || state.board[row][col]) return;
+  function choose(row: number, col: number, tileOverride?: Tile): void {
+    const tile = tileOverride ?? selected;
+    if (!tile || !state || !canAct || exchangeMode || state.board[row][col]) return;
     setDraftVersion((current) => current ?? state.version);
     setPlacements((current) => [
       ...current.filter(
         (placement) =>
-          placement.tileId !== selected.id && (placement.row !== row || placement.col !== col),
+          placement.tileId !== tile.id && (placement.row !== row || placement.col !== col),
       ),
       {
         row,
         col,
-        tileId: selected.id,
+        tileId: tile.id,
         letter:
-          selected.letter === '*'
+          tile.letter === '*'
             ? (window.prompt('Lettre du joker') || 'A').slice(0, 1).toUpperCase()
-            : selected.letter,
+            : tile.letter,
       },
     ]);
     setSelected(null);
   }
+
+  // Keep chooseRef up-to-date for touch event handlers
+  chooseRef.current = choose;
 
   function selectRackTile(tile: Tile): void {
     if (!canAct) return;
@@ -149,6 +160,130 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     }
     setSelected((current) => (current?.id === tile.id ? null : tile));
   }
+
+  /* ── Drag-and-drop (desktop) ────────────────────── */
+
+  function handleDragStart(tile: Tile, event: React.DragEvent): void {
+    if (!canAct || exchangeMode) return;
+    event.dataTransfer.setData('text/plain', tile.id);
+    event.dataTransfer.effectAllowed = 'move';
+    // custom transparent image so we keep our own visual
+    const blank = new Image();
+    blank.src =
+      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    event.dataTransfer.setDragImage(blank, 0, 0);
+    setSelected(tile);
+    setIsDragging(true);
+    dragTileRef.current = tile;
+  }
+
+  function handleDragOver(row: number, col: number, event: React.DragEvent): void {
+    if (!state || !dragTileRef.current || !canAct || state.board[row][col]) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDragEnter(row: number, col: number): void {
+    if (!state || !dragTileRef.current || state.board[row][col]) return;
+    setHoverCell({ row, col });
+  }
+
+  function handleDragLeave(row: number, col: number): void {
+    setHoverCell((current) =>
+      current?.row === row && current?.col === col ? null : current,
+    );
+  }
+
+  function handleDrop(row: number, col: number, event: React.DragEvent): void {
+    event.preventDefault();
+    setIsDragging(false);
+    const tileId = event.dataTransfer.getData('text/plain');
+    const tile = (me?.rack ?? []).find((t) => t.id === tileId);
+    if (tile && state && !state.board[row][col]) {
+      choose(row, col, tile);
+    }
+    setHoverCell(null);
+    dragTileRef.current = null;
+  }
+
+  function handleDragEnd(): void {
+    setIsDragging(false);
+    setHoverCell(null);
+    dragTileRef.current = null;
+  }
+
+  /* ── Touch drag-and-drop (mobile) ───────────────── */
+
+  function handleTouchStartTile(tile: Tile, event: React.TouchEvent): void {
+    if (!canAct || exchangeMode) return;
+    event.preventDefault();
+
+    setSelected(tile);
+    setIsDragging(true);
+    dragTileRef.current = tile;
+
+    const touch = event.touches[0];
+    const ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    const ghostLetter = document.createElement('strong');
+    ghostLetter.textContent = tile.letter === '*' ? '*' : tile.letter;
+    const ghostScore = document.createElement('small');
+    ghostScore.textContent = String(tile.blank ? 0 : tile.points);
+    ghost.append(ghostLetter, ghostScore);
+    ghost.style.left = `${touch.clientX - 24}px`;
+    ghost.style.top = `${touch.clientY - 26}px`;
+    document.body.appendChild(ghost);
+    touchGhostRef.current = ghost;
+  }
+
+  /* Global touch-move / touch-end listeners (active only during a drag) */
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const ghost = touchGhostRef.current;
+    if (!ghost) return;
+
+    let targetCell: { row: number; col: number } | null = null;
+
+    function onTouchMove(event: TouchEvent): void {
+      event.preventDefault();
+      const touch = event.touches[0];
+      ghost.style.left = `${touch.clientX - 24}px`;
+      ghost.style.top = `${touch.clientY - 26}px`;
+
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const cell = el?.closest('[data-cell-row]') as HTMLElement | null;
+      targetCell = cell
+        ? { row: Number(cell.dataset.cellRow), col: Number(cell.dataset.cellCol) }
+        : null;
+    }
+
+    function onTouchEnd(): void {
+      ghost.remove();
+      touchGhostRef.current = null;
+
+      if (targetCell && dragTileRef.current) {
+        const gs = gameStateRef.current;
+        const { row, col } = targetCell;
+        if (gs.state && !gs.state.board[row][col] && gs.canAct && !gs.exchangeMode) {
+          chooseRef.current(row, col, dragTileRef.current);
+        }
+      }
+
+      dragTileRef.current = null;
+      setIsDragging(false);
+      setSelected(null);
+    }
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+    document.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [isDragging]);
 
   async function act(kind: 'pass' | 'resign' | 'exchange'): Promise<void> {
     if (!state || !canAct) return;
@@ -258,9 +393,15 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 return (
                   <button
                     key={`${rowIndex}-${colIndex}`}
-                    className={`cell ${multiplier || ''} ${staged ? 'staged' : ''}`}
+                    data-cell-row={rowIndex}
+                    data-cell-col={colIndex}
+                    className={`cell ${multiplier || ''} ${staged ? 'staged' : ''} ${hoverCell?.row === rowIndex && hoverCell?.col === colIndex ? 'drag-hover' : ''}`}
                     onClick={() => choose(rowIndex, colIndex)}
                     disabled={!canAct || finished}
+                    onDragOver={(event) => handleDragOver(rowIndex, colIndex, event)}
+                    onDragEnter={() => handleDragEnter(rowIndex, colIndex)}
+                    onDragLeave={() => handleDragLeave(rowIndex, colIndex)}
+                    onDrop={(event) => handleDrop(rowIndex, colIndex, event)}
                     aria-label={
                       cell
                         ? `${cell.letter}, ${cell.blank ? 0 : cell.points} point(s)`
@@ -331,8 +472,12 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
               <button
                 key={tile.id}
                 disabled={used || !canAct || finished}
-                className={selected?.id === tile.id || exchangeSelected ? 'selected' : ''}
+                className={`${selected?.id === tile.id || exchangeSelected ? 'selected' : ''} ${isDragging && dragTileRef.current?.id === tile.id ? 'dragging' : ''}`}
+                draggable={!used && canAct && !finished && !exchangeMode}
                 onClick={() => selectRackTile(tile)}
+                onDragStart={(event) => handleDragStart(tile, event)}
+                onDragEnd={handleDragEnd}
+                onTouchStart={(event) => handleTouchStartTile(tile, event)}
                 aria-pressed={selected?.id === tile.id || exchangeSelected}
               >
                 <strong>{tile.letter}</strong>

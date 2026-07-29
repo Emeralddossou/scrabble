@@ -331,6 +331,38 @@ small {
   color: #2c2114;
   box-shadow: inset -3px -3px #ab8048;
 }
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 999;
+  width: 48px;
+  height: 52px;
+  background: linear-gradient(145deg, #edd29e, #c8a568);
+  color: #2c2114;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  box-shadow: 0 8px 25px #0008;
+  opacity: 0.92;
+  transform: scale(1.1);
+}
+.drag-ghost small {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 0.62rem;
+}
+.cell.drag-hover {
+  outline: 3px solid var(--gold);
+  z-index: 2;
+  transform: scale(1.05);
+}
+.rack button.dragging {
+  opacity: 0.3;
+}
 .game-side {
   display: grid;
   gap: 16px;
@@ -379,6 +411,7 @@ small {
   position: relative;
   padding: 0;
   border-radius: 6px;
+  touch-action: none;
 }
 .rack button.selected {
   outline: 4px solid var(--lime);
