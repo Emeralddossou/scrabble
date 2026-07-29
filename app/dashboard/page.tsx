@@ -17,6 +17,7 @@ type Dash = {
   user: { id: number; username: string; wins: number; losses: number; draws: number };
   games: Array<{
     id: number;
+    uuid: string;
     opponent: string | null;
     mode: 'free' | 'timer';
     status: 'active' | 'finished';
@@ -143,7 +144,7 @@ export default function Dashboard() {
                 key={game.id}
                 onClick={() =>
                   router.push(
-                    game.status === 'finished' ? `/replay/${game.id}` : `/game/${game.id}`,
+                    game.status === 'finished' ? `/replay/${game.uuid}` : `/game/${game.uuid}`,
                   )
                 }
               >
@@ -180,11 +181,11 @@ export default function Dashboard() {
               <div>
                 <button
                   onClick={async () => {
-                    const result = await rpc<{ gameId: number }>('respondInvite', {
+                    const result = await rpc<{ uuid: string }>('respondInvite', {
                       inviteId: Number(invitation.id),
                       accept: true,
                     });
-                    router.push(`/game/${result.gameId}`);
+                    router.push(`/game/${result.uuid}`);
                   }}
                 >
                   Accepter

@@ -102,6 +102,27 @@ const migrations: Migration[] = [
       'CREATE UNIQUE INDEX users_email_unique ON users(email)',
     ],
   },
+  {
+    version: 3,
+    sqlite: [
+      "ALTER TABLE games ADD COLUMN uuid TEXT",
+      `UPDATE games SET uuid = printf(
+        '%s-%s-%s-%s-%s',
+        substr(hex(randomblob(4)),1,8),
+        substr(hex(randomblob(2)),1,4),
+        printf('4%s',substr(hex(randomblob(2)),1,3)),
+        printf('%x%s',8+abs(random())%4,substr(hex(randomblob(2)),1,3)),
+        substr(hex(randomblob(6)),1,12)
+      ) WHERE uuid IS NULL`,
+      "CREATE UNIQUE INDEX games_uuid ON games(uuid)",
+    ],
+    mysql: [
+      "ALTER TABLE games ADD COLUMN uuid CHAR(36)",
+      "UPDATE games SET uuid = UUID() WHERE uuid IS NULL",
+      "ALTER TABLE games MODIFY uuid CHAR(36) NOT NULL",
+      "CREATE UNIQUE INDEX games_uuid ON games(uuid)",
+    ],
+  },
 ];
 
 function resumableStatement(statement: string, dialect: Database['dialect']): string {

@@ -40,7 +40,7 @@ test('deux joueurs créent, jouent et terminent une partie libre', async ({ brow
     await expect(receivedInvite).toBeVisible({ timeout: 15_000 });
     await expect(receivedInvite.getByText('Partie libre, sans limite de temps')).toBeVisible();
     await receivedInvite.getByRole('button', { name: 'Accepter' }).click();
-    await bob.waitForURL(/\/game\/\d+$/);
+    await bob.waitForURL(/\/game\/[a-f0-9-]+$/);
     const gameUrl = bob.url();
 
     await alice.goto(gameUrl);
@@ -58,7 +58,7 @@ test('deux joueurs créent, jouent et terminent une partie libre', async ({ brow
     });
 
     await bob.getByRole('button', { name: 'Voir le replay' }).click();
-    await bob.waitForURL(/\/replay\/\d+$/);
+    await bob.waitForURL(/\/replay\/[a-f0-9-]+$/);
     await expect(bob.getByRole('heading', { name: 'Replay' })).toBeVisible();
     await expect(bob.getByText('pass', { exact: true })).toBeVisible();
     await expect(bob.getByText('resign', { exact: true })).toBeVisible();

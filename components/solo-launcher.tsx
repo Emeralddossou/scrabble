@@ -39,13 +39,13 @@ export function SoloLauncher(): React.JSX.Element {
     setBusy(true);
     setError('');
     try {
-      const result = await rpc<{ gameId: number }>('createSolo', {
+      const result = await rpc<{ uuid: string }>('createSolo', {
         mode,
         timeLimit: minutes,
         increment,
         aiLevel: level,
       });
-      router.push(`/game/${result.gameId}`);
+      router.push(`/game/${result.uuid}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La partie solo n’a pas pu être créée.');
       setBusy(false);

@@ -17,6 +17,7 @@ import { conflict, forbidden, validationError } from '@/server/security/errors';
 
 type GameRow = Row & {
   id: number;
+  uuid: string;
   status: string;
   mode: GameMode;
   is_solo: number;
@@ -95,7 +96,10 @@ async function ensureBot(tx: Database, level: string): Promise<number> {
   return created.insertId;
 }
 
-async function createGameInTransaction(tx: Database, input: CreateGameInput): Promise<number> {
+async function createGameInTransaction(
+  tx: Database,
+  input: CreateGameInput,
+): Promise<{ gameId: number; uuid: string }> {
   const opponentId = input.aiLevel ? await ensureBot(tx, input.aiLevel) : input.opponentId;
   if (!opponentId) throw validationError('Un adversaire est requis.');
   if (Number(opponentId) === Number(input.userId)) {
@@ -110,6 +114,7 @@ async function createGameInTransaction(tx: Database, input: CreateGameInput): Pr
     throw validationError('Un des joueurs est introuvable.');
   }
 
+  const uuid = randomUUID();
   let bag = createBag();
   const first = draw(bag, 7);
   bag = first.bag;
@@ -117,9 +122,10 @@ async function createGameInTransaction(tx: Database, input: CreateGameInput): Pr
   bag = second.bag;
   const seconds = input.mode === 'timer' ? input.timeLimitMinutes * 60 : 0;
   const game = await tx.execute(
-    `INSERT INTO games(status,mode,is_solo,ai_level,current_player_id,time_limit_seconds,increment_seconds,board,bag)
-     VALUES('active',?,?,?,?,?,?,?,?)`,
+    `INSERT INTO games(uuid,status,mode,is_solo,ai_level,current_player_id,time_limit_seconds,increment_seconds,board,bag)
+     VALUES(?,?,?,?,?,?,?,?,?,?)`,
     [
+      uuid,
       input.mode,
       input.aiLevel ? 1 : 0,
       input.aiLevel ?? null,
@@ -138,15 +144,20 @@ async function createGameInTransaction(tx: Database, input: CreateGameInput): Pr
     'INSERT INTO game_players(game_id,user_id,rack,score,time_remaining,turn_order) VALUES(?,?,?,?,?,?)',
     [game.insertId, opponentId, json(second.tiles), 0, seconds, 2],
   );
-  return game.insertId;
+  return { gameId: game.insertId, uuid };
 }
 
-export async function createGame(input: CreateGameInput): Promise<number> {
+export async function createGame(
+  input: CreateGameInput,
+): Promise<{ gameId: number; uuid: string }> {
   const db = await getDb();
   return db.transaction((tx) => createGameInTransaction(tx, input));
 }
 
-export async function acceptInvitation(invitationId: number, recipientId: number): Promise<number> {
+export async function acceptInvitation(
+  invitationId: number,
+  recipientId: number,
+): Promise<{ gameId: number; uuid: string }> {
   const db = await getDb();
   return db.transaction(async (tx) => {
     const invitation = (
@@ -175,6 +186,13 @@ export async function acceptInvitation(invitationId: number, recipientId: number
       incrementSeconds: Number(invitation.increment_seconds),
     });
   });
+}
+
+export async function resolveGameUuid(uuid: string): Promise<number> {
+  const db = await getDb();
+  const game = (await db.query<GameRow>('SELECT id FROM games WHERE uuid=?', [uuid]))[0];
+  if (!game) throw validationError('Partie introuvable.');
+  return Number(game.id);
 }
 
 async function gameAndPlayer(

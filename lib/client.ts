@@ -70,7 +70,7 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
     clearPrivateCache();
     return result;
   }
-  if (action === 'state') return api<T>(`/api/games/${payload.gameId}`);
+  if (action === 'state') return api<T>(`/api/games/${payload.gameUuid}`);
   if (action === 'createSolo') {
     return api<T>('/api/games', {
       method: 'POST',
@@ -106,7 +106,7 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
     });
   }
   if (action === 'play') {
-    return api<T>(`/api/games/${payload.gameId}/moves`, {
+    return api<T>(`/api/games/${payload.gameUuid}/moves`, {
       method: 'POST',
       body: JSON.stringify({
         expectedVersion: payload.version,
@@ -116,7 +116,7 @@ export async function rpc<T>(action: string, payload: Record<string, unknown> = 
     });
   }
   if (action === 'gameAction') {
-    return api<T>(`/api/games/${payload.gameId}/actions`, {
+    return api<T>(`/api/games/${payload.gameUuid}/actions`, {
       method: 'POST',
       body: JSON.stringify({
         expectedVersion: payload.version,

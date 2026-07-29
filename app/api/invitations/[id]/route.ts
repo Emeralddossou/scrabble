@@ -22,7 +22,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     }
 
     if (value.action === 'accept') {
-      return success({ gameId: await acceptInvitation(id, user.id) }, requestId);
+      const { uuid } = await acceptInvitation(id, user.id);
+      return success({ uuid }, requestId);
     }
 
     const db = await getDb();

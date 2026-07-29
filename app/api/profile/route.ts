@@ -27,7 +27,7 @@ export async function GET() {
       )
     )[0];
     const games = await db.query<Row>(
-      `SELECT g.id,g.status,g.mode,g.is_solo,g.ai_level,g.winner_id,g.created_at,g.ended_at,
+      `SELECT g.id,g.uuid,g.status,g.mode,g.is_solo,g.ai_level,g.winner_id,g.created_at,g.ended_at,
               other.user_id AS opponent_id,u.username AS opponent
        FROM games g
        JOIN game_players mine ON mine.game_id=g.id AND mine.user_id=?

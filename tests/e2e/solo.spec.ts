@@ -19,7 +19,7 @@ test('une partie solo experte répond au joueur et rend le tour', async ({ page 
   await dialog.getByRole('button', { name: 'Expert' }).click();
   await expect(dialog.getByLabel('Mode de jeu')).toHaveValue('free');
   await dialog.getByRole('button', { name: 'Commencer la partie' }).click();
-  await page.waitForURL(/\/game\/\d+$/);
+  await page.waitForURL(/\/game\/[a-f0-9-]+$/);
 
   await expect(page.getByText('LexiBot-hard', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'À vous de composer' })).toBeVisible();

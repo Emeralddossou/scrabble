@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { multiplierAt } from '@/lib/board';
 import { cached, putCache, rpc } from '@/lib/client';
+import { LETTER_VALUES } from '@/lib/tiles';
 import type { Board, Placement, Tile, WordScore } from '@/lib/types';
 
 type PlayerView = {
@@ -43,7 +44,7 @@ function formatTime(seconds: number): string {
 
 export default function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const gameId = Number(id);
+  const gameUuid = id;
   const router = useRouter();
   const [state, setState] = useState<State | null>(null);
   const [placements, setPlacements] = useState<Placement[]>([]);
@@ -56,7 +57,19 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const [receivedAt, setReceivedAt] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
   const [isDragging, setIsDragging] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [hoverCell, setHoverCell] = useState<{ row: number; col: number } | null>(null);
+
+  const me = useMemo(() => state?.players.find((player) => player.rack !== undefined), [state]);
+  const finished = state?.status === 'finished';
+  const myTurn = Boolean(
+    state &&
+    me &&
+    state.status === 'active' &&
+    Number(state.current_player_id) === Number(me.user_id),
+  );
+  const canAct = myTurn && !offline;
+
   const dragTileRef = useRef<Tile | null>(null);
   const touchGhostRef = useRef<HTMLDivElement | null>(null);
   const chooseRef = useRef<(row: number, col: number, tileOverride?: Tile) => void>(() => {});
@@ -65,16 +78,16 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
   const load = useCallback(async () => {
     try {
-      const next = await rpc<State>('state', { gameId });
+      const next = await rpc<State>('state', { gameUuid });
       setState(next);
       setReceivedAt(Date.now());
-      putCache(`game:${gameId}`, next);
+      putCache(`game:${gameUuid}`, next);
       setOffline(false);
     } catch {
-      setState((current) => current ?? cached(`game:${gameId}`));
+      setState((current) => current ?? cached(`game:${gameUuid}`));
       setOffline(true);
     }
-  }, [gameId]);
+  }, [gameUuid]);
 
   useEffect(() => {
     void load();
@@ -106,16 +119,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       setMessage('La partie a changé : votre brouillon local a été rappelé.');
     }
   }, [draftVersion, state]);
-
-  const me = useMemo(() => state?.players.find((player) => player.rack !== undefined), [state]);
-  const finished = state?.status === 'finished';
-  const myTurn = Boolean(
-    state &&
-    me &&
-    state.status === 'active' &&
-    Number(state.current_player_id) === Number(me.user_id),
-  );
-  const canAct = myTurn && !offline;
 
   function clearDraft(): void {
     setPlacements([]);
@@ -243,13 +246,14 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     const ghost = touchGhostRef.current;
     if (!ghost) return;
 
+    const ghostEl = ghost;
     let targetCell: { row: number; col: number } | null = null;
 
     function onTouchMove(event: TouchEvent): void {
       event.preventDefault();
       const touch = event.touches[0];
-      ghost.style.left = `${touch.clientX - 24}px`;
-      ghost.style.top = `${touch.clientY - 26}px`;
+      ghostEl.style.left = `${touch.clientX - 24}px`;
+      ghostEl.style.top = `${touch.clientY - 26}px`;
 
       const el = document.elementFromPoint(touch.clientX, touch.clientY);
       const cell = el?.closest('[data-cell-row]') as HTMLElement | null;
@@ -259,7 +263,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     }
 
     function onTouchEnd(): void {
-      ghost.remove();
+      ghostEl.remove();
       touchGhostRef.current = null;
 
       if (targetCell && dragTileRef.current) {
@@ -285,17 +289,37 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     };
   }, [isDragging]);
 
+  function estimateDraftScore(): number {
+    if (!state || placements.length === 0 || !me) return 0;
+    const tileMap = new Map((me.rack ?? []).map((t) => [t.id, t]));
+    let letterSum = 0;
+    let wordMult = 1;
+    for (const p of placements) {
+      const tile = tileMap.get(p.tileId);
+      if (!tile) continue;
+      let pts = tile.blank ? 0 : LETTER_VALUES[tile.letter]?.points ?? 0;
+      const mult = multiplierAt(p.row, p.col);
+      if (mult === 'DL') pts *= 2;
+      if (mult === 'TL') pts *= 3;
+      if (mult === 'DW' || mult === 'ST') wordMult *= 2;
+      if (mult === 'TW') wordMult *= 3;
+      letterSum += pts;
+    }
+    return letterSum * wordMult + (placements.length === 7 ? 50 : 0);
+  }
+
   async function act(kind: 'pass' | 'resign' | 'exchange'): Promise<void> {
-    if (!state || !canAct) return;
+    if (!state || !canAct || submitting) return;
     if (kind === 'resign' && !window.confirm('Confirmer l’abandon de cette partie ?')) return;
     if (kind === 'exchange' && exchangeIds.length === 0) {
       setExchangeMode(true);
       setMessage('Sélectionnez une ou plusieurs lettres à échanger.');
       return;
     }
+    setSubmitting(true);
     try {
       await rpc('gameAction', {
-        gameId,
+        gameUuid,
         version: Number(state.version),
         kind,
         tileIds: kind === 'exchange' ? exchangeIds : [],
@@ -307,14 +331,17 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Erreur');
       await load();
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function submit(): Promise<void> {
-    if (!state || !canAct || placements.length === 0) return;
+    if (!state || !canAct || placements.length === 0 || submitting) return;
+    setSubmitting(true);
     try {
       const result = await rpc<{ score: number; words: WordScore[] }>('play', {
-        gameId,
+        gameUuid,
         version: Number(state.version),
         placements,
       });
@@ -324,6 +351,8 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Erreur');
       await load();
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -430,12 +459,17 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
               <>
                 <h2>{winner ? `${winner.username} remporte la partie` : 'Partie nulle'}</h2>
                 <p>Motif : {state.end_reason ?? 'fin de partie'}</p>
-                <button onClick={() => router.push(`/replay/${gameId}`)}>Voir le replay</button>
+                <button onClick={() => router.push(`/replay/${gameUuid}`)}>Voir le replay</button>
               </>
             ) : (
               <>
                 <h2>{myTurn ? 'À vous de composer' : 'Tour adverse'}</h2>
                 <p>{state.bag_count} lettres restantes</p>
+                {myTurn && placements.length > 0 && (
+                  <p className="draft-score">
+                    Coup en cours : <strong>+{estimateDraftScore()}</strong>
+                  </p>
+                )}
               </>
             )}
             {message && (
@@ -488,18 +522,19 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
         </div>
         <div className="game-buttons">
           <button
+            className={submitting ? 'submitting' : ''}
             onClick={() => void submit()}
-            disabled={!canAct || placements.length === 0 || finished}
+            disabled={!canAct || placements.length === 0 || finished || submitting}
           >
-            Valider
+            {submitting ? 'Validation…' : 'Valider'}
           </button>
-          <button className="quiet" onClick={clearDraft} disabled={placements.length === 0}>
+          <button className="quiet" onClick={clearDraft} disabled={placements.length === 0 || submitting}>
             Rappeler
           </button>
           <button
             className="quiet"
             onClick={() => void act('exchange')}
-            disabled={!canAct || finished}
+            disabled={!canAct || finished || submitting}
           >
             {exchangeMode
               ? exchangeIds.length
@@ -518,13 +553,13 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
               Annuler l’échange
             </button>
           )}
-          <button className="quiet" onClick={() => void act('pass')} disabled={!canAct || finished}>
+          <button className="quiet" onClick={() => void act('pass')} disabled={!canAct || finished || submitting}>
             Passer
           </button>
           <button
-            className="danger"
+            className={`danger${submitting ? ' submitting' : ''}`}
             onClick={() => void act('resign')}
-            disabled={!canAct || finished}
+            disabled={!canAct || finished || submitting}
           >
             Abandonner
           </button>

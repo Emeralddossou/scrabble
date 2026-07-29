@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { requireUser } from '@/server/auth';
-import { playMove } from '@/server/game/service';
+import { playMove, resolveGameUuid } from '@/server/game/service';
 import { assertMutationOrigin, body, failure, success } from '@/server/http';
 
 export const runtime = 'nodejs';
@@ -27,8 +27,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     assertMutationOrigin(request);
     const user = await requireUser();
     const value = await body(request, input);
+    const gameId = await resolveGameUuid((await context.params).id);
     return success(
-      await playMove({ gameId: Number((await context.params).id), userId: user.id, ...value }),
+      await playMove({ gameId, userId: user.id, ...value }),
       requestId,
     );
   } catch (error) {

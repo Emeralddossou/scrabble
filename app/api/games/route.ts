@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
     assertMutationOrigin(request);
     const user = await requireUser();
     const value = await body(request, input);
-    const gameId = await createGame({ userId: user.id, ...value });
-    return success({ gameId }, requestId, 201);
+    const { uuid } = await createGame({ userId: user.id, ...value });
+    return success({ uuid }, requestId, 201);
   } catch (error) {
     return failure(error, requestId);
   }

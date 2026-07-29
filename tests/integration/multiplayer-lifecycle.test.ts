@@ -65,7 +65,7 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
       [alice, bob, 'timer', 900, 5, `${alice}:${bob}`, new Date(Date.now() + 60_000).toISOString()],
     );
 
-    const gameId = await acceptInvitation(invitation.insertId, bob);
+    const { gameId } = await acceptInvitation(invitation.insertId, bob);
     expect(gameId).toBeGreaterThan(0);
     await expect(acceptInvitation(invitation.insertId, bob)).rejects.toThrow();
 
@@ -82,7 +82,7 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
   it('laisse une partie libre active sans limite de temps', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
-    const gameId = await createGame({
+    const { gameId } = await createGame({
       userId: alice,
       opponentId: bob,
       mode: 'free',
@@ -107,7 +107,7 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
   it('valide, score et persiste une vraie pose avant de changer le tour', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
-    const gameId = await createGame({
+    const { gameId } = await createGame({
       userId: alice,
       opponentId: bob,
       mode: 'free',
@@ -160,7 +160,7 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
   it('ajoute l’incrément au joueur après son tour chronométré', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
-    const gameId = await createGame({
+    const { gameId } = await createGame({
       userId: alice,
       opponentId: bob,
       mode: 'timer',
@@ -192,7 +192,7 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
   it('termine atomiquement une partie chronométrée et attribue la victoire une seule fois', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
-    const gameId = await createGame({
+    const { gameId } = await createGame({
       userId: alice,
       opponentId: bob,
       mode: 'timer',
@@ -229,7 +229,7 @@ describe(`cycle de vie multijoueur (${configuredDialect})`, () => {
   it('attribue toujours la victoire à l’adversaire après un abandon, même à score égal', async () => {
     const alice = await createUser('Alice');
     const bob = await createUser('Bob');
-    const gameId = await createGame({
+    const { gameId } = await createGame({
       userId: alice,
       opponentId: bob,
       mode: 'free',

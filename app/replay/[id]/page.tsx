@@ -33,15 +33,15 @@ export default function ReplayPage({
 }: {
   params: Promise<{ id: string }>;
 }): React.JSX.Element {
-  const gameId = Number(use(params).id);
+  const gameUuid = use(params).id;
   const router = useRouter();
   const [state, setState] = useState<ReplayState | null>(null);
   const [index, setIndex] = useState(-1);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    void api<ReplayState>(`/api/games/${gameId}`).then(setState);
-  }, [gameId]);
+    void api<ReplayState>(`/api/games/${gameUuid}`).then(setState);
+  }, [gameUuid]);
 
   useEffect(() => {
     if (!playing || !state) return undefined;

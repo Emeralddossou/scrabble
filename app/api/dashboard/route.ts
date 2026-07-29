@@ -33,7 +33,7 @@ export async function GET() {
       [user.id],
     );
     const games = await db.query<Row>(
-      `SELECT g.id,g.status,g.mode,g.current_player_id,g.winner_id,g.created_at,
+      `SELECT g.id,g.uuid,g.status,g.mode,g.current_player_id,g.winner_id,g.created_at,
        MAX(CASE WHEN gp.user_id<>? THEN u.username END) AS opponent
        FROM games g JOIN game_players mine ON mine.game_id=g.id AND mine.user_id=?
        JOIN game_players gp ON gp.game_id=g.id JOIN users u ON u.id=gp.user_id

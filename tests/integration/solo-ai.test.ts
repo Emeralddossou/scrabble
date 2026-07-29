@@ -47,7 +47,7 @@ describe(`cycle solo avec IA (${configuredDialect})`, () => {
       'INSERT INTO users(username,password_hash) VALUES(?,?)',
       ['SoloHuman', await hashPassword('Scrabble!2026')],
     );
-    const gameId = await createGame({
+    const { gameId } = await createGame({
       userId: created.insertId,
       mode: 'free',
       timeLimitMinutes: 15,

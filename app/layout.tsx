@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: 'LexiForge — Scrabble français',
   description: 'Arène de Scrabble français moderne, rapide et résiliente.',
   manifest: '/manifest.webmanifest',
+  icons: { icon: '/favicon.svg' },
 };
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#101714' };
 
