@@ -43,6 +43,22 @@ button:disabled {
   background: var(--red);
   color: white;
 }
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 16px;
+  background: var(--lime);
+  color: #14200f;
+  font-weight: 800;
+  border-radius: 0 0 8px 8px;
+  text-decoration: none;
+  transition: top 0.15s;
+}
+.skip-link:focus {
+  top: 0;
+}
 .eyebrow {
   color: var(--gold);
   font-size: 0.72rem;
