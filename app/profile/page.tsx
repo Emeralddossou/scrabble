@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { DailyReminderSettings } from '@/components/daily-reminder-settings';
 import { api, clearPrivateCache } from '@/lib/client';
 
 type ProfileData = {
@@ -239,6 +240,8 @@ export default function ProfilePage(): React.JSX.Element {
             </button>
           </form>
         </article>
+
+        <DailyReminderSettings />
 
         <article className="account-card wide-card">
           <h2>Historique récent</h2>

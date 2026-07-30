@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 
-import { ServiceWorker } from '@/components/service-worker';
+import { PwaExperience } from '@/components/pwa-experience';
 
 import './globals.css';
 import './multiplayer.css';
@@ -10,7 +10,11 @@ export const metadata: Metadata = {
   title: 'LexiForge — Scrabble français',
   description: 'Arène de Scrabble français moderne, rapide et résiliente.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/favicon.svg' },
+  icons: {
+    icon: '/favicon.svg',
+    apple: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+  },
+  appleWebApp: { capable: true, title: 'LexiForge', statusBarStyle: 'black-translucent' },
 };
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#101714' };
 
@@ -18,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
   return (
     <html lang="fr">
       <body>
-        <ServiceWorker />
+        <PwaExperience />
         {children}
       </body>
     </html>

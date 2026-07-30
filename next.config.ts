@@ -17,7 +17,7 @@ const config: NextConfig = {
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
         {
           key: 'Content-Security-Policy',
-          value: `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; ${scriptPolicy}; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+          value: `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; ${scriptPolicy}; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
         },
       ],
     },

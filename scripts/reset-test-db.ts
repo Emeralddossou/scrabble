@@ -4,6 +4,8 @@ async function main(): Promise<void> {
   if (process.env.NODE_ENV !== 'test') throw new Error('db:reset est réservé aux tests.');
   const db = await getDb();
   const tables = [
+    'push_deliveries',
+    'push_subscriptions',
     'game_actions',
     'moves',
     'game_players',

@@ -16,6 +16,8 @@ let database: Database;
 
 async function clearData(): Promise<void> {
   for (const table of [
+    'push_deliveries',
+    'push_subscriptions',
     'game_actions',
     'moves',
     'game_players',
@@ -32,6 +34,7 @@ async function clearData(): Promise<void> {
 }
 
 beforeAll(async () => {
+  process.env.AUTH_SECRET = 'integration-auth-material-47q9v2m8x6k4p1dz';
   process.env.DB_TYPE = configuredDialect;
   process.env.DATABASE_URL =
     configuredDialect === 'sqlite'

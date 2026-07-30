@@ -96,6 +96,12 @@
   grid-column: span 2;
 }
 
+.reminder-card .notice {
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+}
+
 .form-grid {
   display: grid;
   gap: 16px;

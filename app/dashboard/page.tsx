@@ -43,6 +43,13 @@ export default function Dashboard() {
   const [timeLimit, setTimeLimit] = useState(15);
   const [increment, setIncrement] = useState(0);
   const [busyPlayerId, setBusyPlayerId] = useState<number | null>(null);
+  const [quickSolo, setQuickSolo] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('quick') !== 'solo') return;
+    setQuickSolo(true);
+    window.history.replaceState({}, '', '/dashboard');
+  }, []);
 
   async function load(): Promise<void> {
     try {
@@ -103,7 +110,7 @@ export default function Dashboard() {
           <p role="status">{error || 'La table est prête.'}</p>
         </div>
         <div className="header-actions">
-          <SoloLauncher />
+          <SoloLauncher autoOpen={quickSolo} />
           <button className="quiet" onClick={() => router.push('/profile')}>
             Mon profil
           </button>

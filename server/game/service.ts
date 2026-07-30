@@ -126,6 +126,7 @@ async function createGameInTransaction(
      VALUES(?,?,?,?,?,?,?,?,?,?)`,
     [
       uuid,
+      'active',
       input.mode,
       input.aiLevel ? 1 : 0,
       input.aiLevel ?? null,

@@ -123,6 +123,45 @@ const migrations: Migration[] = [
       "CREATE UNIQUE INDEX games_uuid ON games(uuid)",
     ],
   },
+  {
+    version: 4,
+    sqlite: [
+      `CREATE TABLE push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id BIGINT NOT NULL, endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL, auth TEXT NOT NULL, notification_hour INTEGER NOT NULL DEFAULT 18,
+        time_zone VARCHAR(100) NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`,
+      'CREATE INDEX push_subscriptions_user_index ON push_subscriptions(user_id, enabled)',
+      `CREATE TABLE push_deliveries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, subscription_id BIGINT NOT NULL,
+        local_date VARCHAR(10) NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        sent_at DATETIME, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(subscription_id, local_date),
+        FOREIGN KEY (subscription_id) REFERENCES push_subscriptions(id) ON DELETE CASCADE
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE push_subscriptions (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id BIGINT NOT NULL, endpoint TEXT NOT NULL,
+        p256dh TEXT NOT NULL, auth TEXT NOT NULL, notification_hour TINYINT NOT NULL DEFAULT 18,
+        time_zone VARCHAR(100) NOT NULL, enabled TINYINT NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE(endpoint(255)), INDEX push_subscriptions_user_index(user_id, enabled),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE push_deliveries (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY, subscription_id BIGINT NOT NULL,
+        local_date VARCHAR(10) NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        sent_at DATETIME, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(subscription_id, local_date),
+        FOREIGN KEY (subscription_id) REFERENCES push_subscriptions(id) ON DELETE CASCADE
+      )`,
+    ],
+  },
 ];
 
 function resumableStatement(statement: string, dialect: Database['dialect']): string {

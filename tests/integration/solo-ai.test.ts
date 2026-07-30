@@ -13,6 +13,8 @@ let database: Database;
 
 async function clearData(): Promise<void> {
   for (const table of [
+    'push_deliveries',
+    'push_subscriptions',
     'game_actions',
     'moves',
     'game_players',

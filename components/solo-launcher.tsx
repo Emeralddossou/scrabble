@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { rpc } from '@/lib/client';
@@ -31,7 +31,7 @@ const LEVELS = [
 
 type Level = (typeof LEVELS)[number]['value'];
 
-export function SoloLauncher(): React.JSX.Element {
+export function SoloLauncher({ autoOpen = false }: { autoOpen?: boolean }): React.JSX.Element {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [level, setLevel] = useState<Level>('medium');
@@ -40,6 +40,10 @@ export function SoloLauncher(): React.JSX.Element {
   const [increment, setIncrement] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
 
   async function create(): Promise<void> {
     setBusy(true);

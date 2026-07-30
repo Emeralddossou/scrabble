@@ -35,9 +35,6 @@ package-lock.json
 yarn.lock
 *.tsbuildinfo
 
-# Generated PWA icons
-public/icons/icon-*.png
-
 # Composer (if using PHP dependencies)
 /vendor/
 composer.lock
