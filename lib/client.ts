@@ -22,7 +22,19 @@ export async function api<T>(path: string, init: RequestInit = {}, timeoutMs = 1
       credentials: 'same-origin',
       signal: controller.signal,
     });
-    const result = (await response.json()) as ApiResponse<T>;
+    const text = await response.text();
+    let result: ApiResponse<T>;
+    try {
+      result = JSON.parse(text) as ApiResponse<T>;
+    } catch {
+      throw new ApiClientError(
+        'HTTP_ERROR',
+        response.status >= 500
+          ? 'Le serveur est momentanément indisponible. Réessayez dans un instant.'
+          : 'La requête a échoué.',
+        response.status,
+      );
+    }
     if (!response.ok || !result.ok) {
       const error = result.ok
         ? { code: 'HTTP_ERROR', message: 'La requête a échoué.' }

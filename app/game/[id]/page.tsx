@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 
 import { multiplierAt } from '@/lib/board';
 import { cached, putCache, rpc } from '@/lib/client';
-import { LETTER_VALUES } from '@/lib/tiles';
 import type { Board, Placement, Tile, WordScore } from '@/lib/types';
+import { Modal } from '@/components/modal';
 
 type PlayerView = {
   user_id: number;
@@ -59,6 +59,12 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [hoverCell, setHoverCell] = useState<{ row: number; col: number } | null>(null);
+  const [blankRequest, setBlankRequest] = useState<{
+    row: number;
+    col: number;
+    tile: Tile;
+  } | null>(null);
+  const [confirmResign, setConfirmResign] = useState(false);
 
   const me = useMemo(() => state?.players.find((player) => player.rack !== undefined), [state]);
   const finished = state?.status === 'finished';
@@ -129,23 +135,31 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   function choose(row: number, col: number, tileOverride?: Tile): void {
     const tile = tileOverride ?? selected;
     if (!tile || !state || !canAct || exchangeMode || state.board[row][col]) return;
+    if (tile.letter === '*') {
+      // Ouvre la modale de choix du joker ; le placement se fera à la sélection.
+      setBlankRequest({ row, col, tile });
+      return;
+    }
+    placeTile(row, col, tile, tile.letter);
+  }
+
+  function placeTile(row: number, col: number, tile: Tile, letter: string): void {
+    if (!state) return;
     setDraftVersion((current) => current ?? state.version);
     setPlacements((current) => [
       ...current.filter(
         (placement) =>
           placement.tileId !== tile.id && (placement.row !== row || placement.col !== col),
       ),
-      {
-        row,
-        col,
-        tileId: tile.id,
-        letter:
-          tile.letter === '*'
-            ? (window.prompt('Lettre du joker') || 'A').slice(0, 1).toUpperCase()
-            : tile.letter,
-      },
+      { row, col, tileId: tile.id, letter },
     ]);
     setSelected(null);
+  }
+
+  function chooseBlankLetter(letter: string): void {
+    if (!blankRequest) return;
+    placeTile(blankRequest.row, blankRequest.col, blankRequest.tile, letter);
+    setBlankRequest(null);
   }
 
   // Keep chooseRef up-to-date for touch event handlers
@@ -292,25 +306,126 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   function estimateDraftScore(): number {
     if (!state || placements.length === 0 || !me) return 0;
     const tileMap = new Map((me.rack ?? []).map((t) => [t.id, t]));
-    let letterSum = 0;
-    let wordMult = 1;
+    // Reconstruit le plateau avec les tuiles en cours de pose.
+    const draft = state.board.map((row) => [...row]);
     for (const p of placements) {
       const tile = tileMap.get(p.tileId);
       if (!tile) continue;
-      let pts = tile.blank ? 0 : LETTER_VALUES[tile.letter]?.points ?? 0;
-      const mult = multiplierAt(p.row, p.col);
-      if (mult === 'DL') pts *= 2;
-      if (mult === 'TL') pts *= 3;
-      if (mult === 'DW' || mult === 'ST') wordMult *= 2;
-      if (mult === 'TW') wordMult *= 3;
-      letterSum += pts;
+      draft[p.row][p.col] = {
+        id: p.tileId,
+        letter: p.letter as Tile['letter'],
+        points: tile.blank ? 0 : tile.points,
+        blank: tile.letter === '*',
+      };
     }
-    return letterSum * wordMult + (placements.length === 7 ? 50 : 0);
+    const placedSet = new Set(placements.map((p) => `${p.row}:${p.col}`));
+
+    // Détermine l'orientation du mot principal.
+    const rows = new Set(placements.map((p) => p.row));
+    const horizontal = rows.size === 1;
+    const wordCells: Array<{ row: number; col: number }> = [];
+    const anchor = placements[0];
+    if (horizontal) {
+      const r = anchor.row;
+      let c = anchor.col;
+      while (c >= 0 && draft[r][c]) c -= 1;
+      c += 1;
+      while (c < 15 && draft[r][c]) {
+        wordCells.push({ row: r, col: c });
+        c += 1;
+      }
+    } else {
+      const c = anchor.col;
+      let r = anchor.row;
+      while (r >= 0 && draft[r][c]) r -= 1;
+      r += 1;
+      while (r < 15 && draft[r][c]) {
+        wordCells.push({ row: r, col: c });
+        r += 1;
+      }
+    }
+
+    // Score du mot principal (inclut les lettres déjà posées, sans multiplicateur).
+    let wordLetterSum = 0;
+    let wordMult = 1;
+    for (const cell of wordCells) {
+      const tile = draft[cell.row][cell.col];
+      if (!tile) continue;
+      let pts = tile.blank ? 0 : tile.points;
+      if (placedSet.has(`${cell.row}:${cell.col}`)) {
+        const mult = multiplierAt(cell.row, cell.col);
+        if (mult === 'DL') pts *= 2;
+        if (mult === 'TL') pts *= 3;
+        if (mult === 'DW' || mult === 'ST') wordMult *= 2;
+        if (mult === 'TW') wordMult *= 3;
+      }
+      wordLetterSum += pts;
+    }
+    let total = wordLetterSum * wordMult;
+
+    // Mots croisés perpendiculaires formés par chaque tuile posée (sous-estimation
+    // volontaire : seules les lettres sont comptées, sans validation du dictionnaire).
+    for (const p of placements) {
+      if (horizontal) {
+        let r = p.row - 1;
+        while (r >= 0 && draft[r][p.col]) r -= 1;
+        const top = r + 1;
+        r = p.row + 1;
+        while (r < 15 && draft[r][p.col]) r += 1;
+        const bottom = r - 1;
+        if (bottom - top < 1) continue;
+        let crossSum = 0;
+        let crossMult = 1;
+        for (let rr = top; rr <= bottom; rr += 1) {
+          const tile = draft[rr][p.col];
+          if (!tile) continue;
+          let pts = tile.blank ? 0 : tile.points;
+          if (rr === p.row) {
+            const mult = multiplierAt(rr, p.col);
+            if (mult === 'DL') pts *= 2;
+            if (mult === 'TL') pts *= 3;
+            if (mult === 'DW' || mult === 'ST') crossMult *= 2;
+            if (mult === 'TW') crossMult *= 3;
+          }
+          crossSum += pts;
+        }
+        total += crossSum * crossMult;
+      } else {
+        let c = p.col - 1;
+        while (c >= 0 && draft[p.row][c]) c -= 1;
+        const left = c + 1;
+        c = p.col + 1;
+        while (c < 15 && draft[p.row][c]) c += 1;
+        const right = c - 1;
+        if (right - left < 1) continue;
+        let crossSum = 0;
+        let crossMult = 1;
+        for (let cc = left; cc <= right; cc += 1) {
+          const tile = draft[p.row][cc];
+          if (!tile) continue;
+          let pts = tile.blank ? 0 : tile.points;
+          if (cc === p.col) {
+            const mult = multiplierAt(p.row, cc);
+            if (mult === 'DL') pts *= 2;
+            if (mult === 'TL') pts *= 3;
+            if (mult === 'DW' || mult === 'ST') crossMult *= 2;
+            if (mult === 'TW') crossMult *= 3;
+          }
+          crossSum += pts;
+        }
+        total += crossSum * crossMult;
+      }
+    }
+
+    return total + (placements.length === 7 ? 50 : 0);
   }
 
   async function act(kind: 'pass' | 'resign' | 'exchange'): Promise<void> {
     if (!state || !canAct || submitting) return;
-    if (kind === 'resign' && !window.confirm('Confirmer l’abandon de cette partie ?')) return;
+    if (kind === 'resign') {
+      setConfirmResign(true);
+      return;
+    }
     if (kind === 'exchange' && exchangeIds.length === 0) {
       setExchangeMode(true);
       setMessage('Sélectionnez une ou plusieurs lettres à échanger.');
@@ -327,6 +442,26 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       clearDraft();
       setExchangeMode(false);
       setExchangeIds([]);
+      await load();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Erreur');
+      await load();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function performResign(): Promise<void> {
+    setConfirmResign(false);
+    if (!state || !canAct || submitting) return;
+    setSubmitting(true);
+    try {
+      await rpc('gameAction', {
+        gameUuid,
+        version: Number(state.version),
+        kind: 'resign',
+        tileIds: [],
+      });
       await load();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Erreur');
@@ -467,7 +602,8 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 <p>{state.bag_count} lettres restantes</p>
                 {myTurn && placements.length > 0 && (
                   <p className="draft-score">
-                    Coup en cours : <strong>+{estimateDraftScore()}</strong>
+                    Coup en cours : <strong>≈ +{estimateDraftScore()}</strong>{' '}
+                    <small>estimation (validation serveur)</small>
                   </p>
                 )}
               </>
@@ -565,6 +701,51 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
           </button>
         </div>
       </footer>
+
+      {blankRequest && (
+        <Modal
+          titleId="blank-title"
+          title="Choisissez la lettre du joker"
+          onClose={() => setBlankRequest(null)}
+        >
+          <p className="lead-small" style={{ marginBottom: '14px' }}>
+            Le joker prend la valeur de votre choix et rapporte 0 point.
+          </p>
+          <div className="blank-grid" role="group" aria-label="Lettres de A à Z">
+            {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => (
+              <button
+                key={letter}
+                type="button"
+                className="blank-tile"
+                aria-label={`Joker ${letter}`}
+                onClick={() => chooseBlankLetter(letter)}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {confirmResign && (
+        <Modal
+          titleId="resign-title"
+          title="Abandonner la partie ?"
+          onClose={() => setConfirmResign(false)}
+        >
+          <p className="lead-small" style={{ marginBottom: '18px' }}>
+            Cette action est définitive : la victoire sera attribuée à votre adversaire.
+          </p>
+          <div className="modal-actions">
+            <button className="danger" onClick={() => void performResign()}>
+              Oui, abandonner
+            </button>
+            <button className="quiet" onClick={() => setConfirmResign(false)}>
+              Continuer la partie
+            </button>
+          </div>
+        </Modal>
+      )}
     </main>
   );
 }

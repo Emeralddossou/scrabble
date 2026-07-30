@@ -216,6 +216,41 @@ textarea {
   margin-top: 22px;
 }
 
+.modal-title {
+  margin-top: 0;
+  font-family: Georgia, serif;
+  font-size: 2rem;
+}
+
+.blank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 8px;
+}
+
+.blank-tile {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 1.2rem;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #edd29e, #c8a568);
+  color: #2c2114;
+  box-shadow: inset -2px -2px #ab8048;
+  padding: 0;
+}
+
+.blank-tile:hover {
+  filter: brightness(1.08);
+}
+
+.blank-tile:focus-visible {
+  outline: 3px solid var(--lime);
+  outline-offset: 2px;
+}
+
 @media (max-width: 760px) {
   .account-header,
   .profile-hero {

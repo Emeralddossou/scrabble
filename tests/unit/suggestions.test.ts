@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { emptyBoard } from '@/domain/scrabble/rules';
+import type { Tile } from '@/domain/scrabble/types';
 import type { Suggestion } from '@/server/game/suggestions';
 import { chooseAiMove, suggestMoves } from '@/server/game/suggestions';
 
@@ -47,7 +48,7 @@ describe('moteur de suggestions solo', () => {
   it('pondère différemment l’equity selon le niveau (expert plus défensif)', async () => {
     const board = emptyBoard();
     board[7][7] = { id: 'fixed-e', letter: 'E', points: 1 };
-    const rack = [
+    const rack: Tile[] = [
       { id: 'r-a', letter: 'A', points: 1 },
       { id: 'r-t', letter: 'T', points: 1 },
       { id: 'r-r', letter: 'R', points: 1 },
@@ -60,7 +61,7 @@ describe('moteur de suggestions solo', () => {
     expect(hard.length).toBeGreaterThan(0);
     // Les classements diffèrent : l'expert et l'avancé ne partagent pas
     // systématiquement le même meilleur coup, car la pondération change.
-    const topScore = (moves: typeof base) => moves[0]?.equity ?? 0;
-    expect(topScore(expert)).not.toEqual(topScore(hard));
+    const topEquity = (moves: typeof base) => moves[0]?.equity ?? 0;
+    expect(topEquity(expert)).not.toEqual(topEquity(hard));
   });
 });
