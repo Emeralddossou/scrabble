@@ -56,6 +56,31 @@ button:disabled {
 .pwa-notice-row span {
   flex: 1;
 }
+.suggestion-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.suggestion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: #0e1512;
+  color: var(--ink);
+  text-align: left;
+}
+.suggestion-row span,
+.feedback-card {
+  display: grid;
+  gap: 5px;
+}
+.feedback-card label {
+  color: var(--muted);
+}
 .quiet {
   background: #25332c;
   color: var(--ink);

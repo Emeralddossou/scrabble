@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { multiplierAt } from '@/lib/board';
-import { cached, putCache, rpc } from '@/lib/client';
+import { api, cached, putCache, rpc } from '@/lib/client';
 import type { Board, Placement, Tile, WordScore } from '@/lib/types';
 import { Modal } from '@/components/modal';
 
@@ -32,9 +32,48 @@ type State = {
   winner_id: number | null;
   end_reason: string | null;
   bag_count: number;
+  is_solo: number;
+  ai_level: string | null;
   players: PlayerView[];
   moves: MoveView[];
 };
+type Suggestion = {
+  word: string;
+  score: number;
+  equity: number;
+  placements: Placement[];
+};
+type FeedbackPreferences = { sound: boolean; haptic: boolean };
+
+const FEEDBACK_KEY = 'lexiforge-game-feedback';
+
+function storedFeedback(): FeedbackPreferences {
+  try {
+    return JSON.parse(localStorage.getItem(FEEDBACK_KEY) ?? '') as FeedbackPreferences;
+  } catch {
+    return { sound: false, haptic: false };
+  }
+}
+
+function playTone(frequency: number): void {
+  try {
+    const Audio =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Audio) return;
+    const context = new Audio();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.035, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.08);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.08);
+  } catch {
+    // Le navigateur peut refuser Web Audio ; le jeu reste entièrement jouable sans son.
+  }
+}
 
 function formatTime(seconds: number): string {
   const safe = Math.max(0, Math.floor(seconds));
@@ -70,6 +109,10 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     tile: Tile;
   } | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [rackOrder, setRackOrder] = useState<string[]>([]);
+  const [feedback, setFeedback] = useState<FeedbackPreferences>({ sound: false, haptic: false });
 
   const me = useMemo(() => state?.players.find((player) => player.rack !== undefined), [state]);
   const finished = state?.status === 'finished';
@@ -93,16 +136,44 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const gameStateRef = useRef({ state: null as State | null, canAct: false, exchangeMode: false });
   gameStateRef.current = { state, canAct, exchangeMode };
 
-  const load = useCallback(async () => {
+  useEffect(() => setFeedback(storedFeedback()), []);
+
+  useEffect(() => {
+    const ids = (me?.rack ?? []).map((tile) => tile.id);
+    setRackOrder((current) => [
+      ...current.filter((id) => ids.includes(id)),
+      ...ids.filter((id) => !current.includes(id)),
+    ]);
+  }, [me?.rack]);
+
+  function notifyFeedback(kind: 'tile' | 'success' | 'error'): void {
+    if (feedback.sound) playTone(kind === 'error' ? 180 : kind === 'success' ? 660 : 440);
+    if (feedback.haptic && 'vibrate' in navigator) {
+      navigator.vibrate(kind === 'error' ? [30, 35, 30] : kind === 'success' ? 22 : 10);
+    }
+  }
+
+  function updateFeedback(next: FeedbackPreferences): void {
+    setFeedback(next);
+    try {
+      localStorage.setItem(FEEDBACK_KEY, JSON.stringify(next));
+    } catch {
+      // Préférence locale facultative, notamment indisponible dans certains modes privés.
+    }
+  }
+
+  const load = useCallback(async (): Promise<boolean> => {
     try {
       const next = await rpc<State>('state', { gameUuid });
       setState(next);
       setReceivedAt(Date.now());
       putCache(`game:${gameUuid}`, next);
       setOffline(false);
+      return true;
     } catch {
       setState((current) => current ?? cached(`game:${gameUuid}`));
       setOffline(true);
+      return false;
     }
   }, [gameUuid]);
 
@@ -113,21 +184,17 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     void load();
     let timer: number | undefined;
-    let backoff = 1000;
+    let backoff = pollInterval;
     const schedule = (): void => {
       timer = window.setTimeout(async () => {
         if (document.visibilityState !== 'visible') {
           schedule();
           return;
         }
-        try {
-          await load();
-          backoff = 1000;
-        } catch {
-          backoff = Math.min(backoff * 2, 30_000);
-        }
+        const connected = await load();
+        backoff = connected ? pollInterval : Math.min(backoff * 2, 30_000);
         schedule();
-      }, pollInterval);
+      }, backoff);
     };
     const refresh = () => {
       if (document.visibilityState === 'visible') void load();
@@ -234,6 +301,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       { row, col, tileId: tile.id, letter },
     ]);
     setSelected(null);
+    notifyFeedback('tile');
   }
 
   function chooseBlankLetter(letter: string): void {
@@ -256,6 +324,19 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       return;
     }
     setSelected((current) => (current?.id === tile.id ? null : tile));
+  }
+
+  function reorderRack(tileId: string, targetId: string): void {
+    if (tileId === targetId) return;
+    setRackOrder((current) => {
+      const source = current.indexOf(tileId);
+      const target = current.indexOf(targetId);
+      if (source < 0 || target < 0) return current;
+      const next = [...current];
+      next.splice(source, 1);
+      next.splice(target, 0, tileId);
+      return next;
+    });
   }
 
   /* ── Drag-and-drop (desktop) ────────────────────── */
@@ -309,6 +390,19 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     dragTileRef.current = null;
   }
 
+  function handleRackDragOver(event: React.DragEvent): void {
+    if (!dragTileRef.current || exchangeMode) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleRackDrop(targetId: string, event: React.DragEvent): void {
+    event.preventDefault();
+    const tileId = event.dataTransfer.getData('text/plain');
+    if (tileId) reorderRack(tileId, targetId);
+    handleDragEnd();
+  }
+
   /* ── Touch drag-and-drop (mobile) ───────────────── */
 
   function handleTouchStartTile(tile: Tile, event: React.TouchEvent): void {
@@ -342,6 +436,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
     const ghostEl = ghost;
     let targetCell: { row: number; col: number } | null = null;
+    let targetRackTileId: string | null = null;
 
     function onTouchMove(event: TouchEvent): void {
       event.preventDefault();
@@ -351,9 +446,11 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
       const el = document.elementFromPoint(touch.clientX, touch.clientY);
       const cell = el?.closest('[data-cell-row]') as HTMLElement | null;
+      const rackTile = el?.closest('[data-rack-tile]') as HTMLElement | null;
       targetCell = cell
         ? { row: Number(cell.dataset.cellRow), col: Number(cell.dataset.cellCol) }
         : null;
+      targetRackTileId = rackTile?.dataset.rackTile ?? null;
     }
 
     function onTouchEnd(): void {
@@ -366,6 +463,8 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
         if (gs.state && !gs.state.board[row][col] && gs.canAct && !gs.exchangeMode) {
           chooseRef.current(row, col, dragTileRef.current);
         }
+      } else if (targetRackTileId && dragTileRef.current) {
+        reorderRack(dragTileRef.current.id, targetRackTileId);
       }
 
       dragTileRef.current = null;
@@ -523,8 +622,10 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       setExchangeMode(false);
       setExchangeIds([]);
       await load();
+      notifyFeedback('success');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Erreur');
+      notifyFeedback('error');
       await load();
     } finally {
       setSubmitting(false);
@@ -543,8 +644,10 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
         tileIds: [],
       });
       await load();
+      notifyFeedback('success');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Erreur');
+      notifyFeedback('error');
       await load();
     } finally {
       setSubmitting(false);
@@ -563,8 +666,10 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       setMessage(`${result.words.map((word) => word.word).join(', ')} : +${result.score} points`);
       clearDraft();
       await load();
+      notifyFeedback('success');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Erreur');
+      notifyFeedback('error');
       await load();
     } finally {
       setSubmitting(false);
@@ -592,6 +697,31 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   }
 
   const winner = state.players.find((player) => Number(player.user_id) === Number(state.winner_id));
+  const orderedRack = [...(me.rack ?? [])].sort(
+    (left, right) => rackOrder.indexOf(left.id) - rackOrder.indexOf(right.id),
+  );
+
+  async function loadSuggestions(): Promise<void> {
+    setSuggestionsLoading(true);
+    setMessage('');
+    try {
+      const result = await api<{ suggestions: Suggestion[] }>(`/api/games/${gameUuid}/suggestions`);
+      setSuggestions(result.suggestions);
+      if (!result.suggestions.length) setMessage('Aucun coup légal n’a été trouvé pour ce chevalet.');
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Les suggestions sont indisponibles.');
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }
+
+  function previewSuggestion(suggestion: Suggestion): void {
+    if (!state) return;
+    setDraftVersion(state.version);
+    setPlacements(suggestion.placements);
+    setSelected(null);
+    setMessage(`${suggestion.word} : +${suggestion.score} points. Vérifiez puis validez votre coup.`);
+  }
 
   return (
     <main className="game-shell">
@@ -716,12 +846,64 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 </div>
               ))}
           </div>
+          {Number(state.is_solo) === 1 && myTurn && !finished && (
+            <div className="side-card training-card">
+              <p className="eyebrow">ENTRAÎNEMENT SOLO</p>
+              <h3>Besoin d’un indice ?</h3>
+              <p>Les propositions restent privées à cette partie contre l’IA.</p>
+              <button
+                type="button"
+                className="quiet"
+                disabled={suggestionsLoading || submitting}
+                onClick={() => void loadSuggestions()}
+              >
+                {suggestionsLoading ? 'Recherche…' : 'Suggérer un coup'}
+              </button>
+              {suggestions.length > 0 && (
+                <div className="suggestion-list" aria-live="polite">
+                  {suggestions.slice(0, 3).map((suggestion) => (
+                    <button
+                      type="button"
+                      className="suggestion-row"
+                      key={`${suggestion.word}:${suggestion.placements.map((item) => item.tileId).join('-')}`}
+                      onClick={() => previewSuggestion(suggestion)}
+                    >
+                      <span>
+                        <b>{suggestion.word}</b>
+                        <small>{suggestion.placements.length} lettre(s) posée(s)</small>
+                      </span>
+                      <strong>+{suggestion.score}</strong>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="side-card feedback-card">
+            <h3>Retours de jeu</h3>
+            <label>
+              <input
+                type="checkbox"
+                checked={feedback.sound}
+                onChange={(event) => updateFeedback({ ...feedback, sound: event.target.checked })}
+              />{' '}
+              Sons discrets
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={feedback.haptic}
+                onChange={(event) => updateFeedback({ ...feedback, haptic: event.target.checked })}
+              />{' '}
+              Vibration tactile
+            </label>
+          </div>
         </aside>
       </div>
 
       <footer className="rack-dock">
         <div className="rack" aria-label="Votre chevalet">
-          {(me.rack ?? []).map((tile) => {
+          {orderedRack.map((tile) => {
             const used = placements.some((placement) => placement.tileId === tile.id);
             const exchangeSelected = exchangeIds.includes(tile.id);
             return (
@@ -733,8 +915,19 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 onClick={() => selectRackTile(tile)}
                 onDragStart={(event) => handleDragStart(tile, event)}
                 onDragEnd={handleDragEnd}
+                onDragOver={handleRackDragOver}
+                onDrop={(event) => handleRackDrop(tile.id, event)}
                 onTouchStart={(event) => handleTouchStartTile(tile, event)}
+                onKeyDown={(event) => {
+                  if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+                  event.preventDefault();
+                  const index = orderedRack.findIndex((item) => item.id === tile.id);
+                  const target = orderedRack[index + (event.key === 'ArrowLeft' ? -1 : 1)];
+                  if (target) reorderRack(tile.id, target.id);
+                }}
+                data-rack-tile={tile.id}
                 aria-pressed={selected?.id === tile.id || exchangeSelected}
+                aria-label={`${tile.letter}, ${tile.points} point(s). Alt + flèche gauche ou droite pour réorganiser.`}
               >
                 <strong>{tile.letter}</strong>
                 <small>{tile.points}</small>
