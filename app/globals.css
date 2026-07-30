@@ -278,12 +278,13 @@ small {
 }
 .board-wrap {
   overflow: auto;
+  display: flex;
+  justify-content: center;
 }
 .board {
   display: grid;
   grid-template-columns: repeat(15, 1fr);
-  width: min(82vh, 900px);
-  min-width: 570px;
+  width: min(82vh, 900px, 94vw);
   aspect-ratio: 1;
   background: #17221c;
   border: 8px solid #715334;
@@ -317,13 +318,14 @@ small {
 }
 .cell strong,
 .rack strong {
-  font-size: clamp(0.75rem, 2vw, 1.5rem);
+  font-size: clamp(0.6rem, 2.2vw, 1.5rem);
 }
 .cell small,
 .rack small {
   position: absolute;
-  right: 4px;
-  bottom: 2px;
+  right: 3px;
+  bottom: 1px;
+  font-size: clamp(0.45rem, 1.1vw, 0.8rem);
 }
 .cell:has(strong),
 .rack button {
@@ -359,6 +361,16 @@ small {
   outline: 3px solid var(--gold);
   z-index: 2;
   transform: scale(1.05);
+}
+
+.cell.played {
+  outline: 2px solid var(--lime);
+  z-index: 1;
+}
+
+.cell.played strong {
+  color: var(--gold);
+  text-shadow: 0 0 6px var(--lime);
 }
 .rack button.dragging {
   opacity: 0.3;
@@ -406,12 +418,8 @@ small {
   border-radius: 10px;
 }
 .rack button {
-  width: calc(min(82vh, 900px) / 15);
-  height: calc(min(82vh, 900px) / 15);
-  max-width: 60px;
-  max-height: 60px;
-  min-width: 42px;
-  min-height: 42px;
+  width: clamp(38px, calc(82vh / 15), 60px);
+  height: clamp(38px, calc(82vh / 15), 60px);
   position: relative;
   padding: 0;
   border-radius: 6px;
@@ -485,7 +493,7 @@ button.submitting::after {
     justify-content: center;
   }
   .game-shell {
-    padding-bottom: 220px;
+    padding-bottom: 260px;
   }
   .dash-grid {
     grid-template-columns: 1fr;

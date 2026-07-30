@@ -14,6 +14,7 @@ type ReplayMove = {
   words: WordScore[];
   points: number;
   snapshot: string | null;
+  placements: Array<{ row: number; col: number; tileId: string; letter: string }>;
 };
 type ReplayState = {
   status: string;
@@ -67,8 +68,11 @@ export default function ReplayPage({
 
   if (!state || !board) return <main className="center-screen">Chargement du replay…</main>;
 
-  const selectedMove = index >= 0 ? state.moves[index] : null;
+    const selectedMove = index >= 0 ? state.moves[index] : null;
   const winner = state.players.find((player) => Number(player.user_id) === Number(state.winner_id));
+  const playedCells = new Set(
+    (selectedMove?.placements ?? []).map((p) => `${p.row}:${p.col}`),
+  );
 
   return (
     <main className="game-shell">
@@ -88,11 +92,13 @@ export default function ReplayPage({
       <div className="game-grid">
         <section className="board-wrap">
           <div className="board" aria-label="Plateau du replay">
-            {board.flatMap((row, rowIndex) =>
+                        {board.flatMap((row, rowIndex) =>
               row.map((cell, colIndex) => (
                 <div
                   key={`${rowIndex}-${colIndex}`}
-                  className={`cell ${multiplierAt(rowIndex, colIndex) ?? ''}`}
+                  className={`cell ${multiplierAt(rowIndex, colIndex) ?? ''} ${
+                    playedCells.has(`${rowIndex}:${colIndex}`) ? 'played' : ''
+                  }`}
                 >
                   {cell && (
                     <>

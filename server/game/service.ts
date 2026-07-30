@@ -286,6 +286,15 @@ async function finalize(
     'SELECT user_id,score FROM game_players WHERE game_id=? ORDER BY score DESC,user_id',
     [game.id],
   );
+  // Exclure les comptes bots des mises à jour de statistiques.
+  const botNames = new Set(
+    (
+      await tx.query<Row>(
+        "SELECT id FROM users WHERE username LIKE 'LexiBot-%' AND id IN (?,?)",
+        [ranked[0]?.user_id, ranked[1]?.user_id],
+      )
+    ).map((row) => Number(row.id)),
+  );
   const forcedWinner = winnerHint !== undefined;
   const tie =
     !forcedWinner && ranked.length > 1 && Number(ranked[0].score) === Number(ranked[1].score);
@@ -293,18 +302,21 @@ async function finalize(
   await tx.execute('UPDATE games SET winner_id=? WHERE id=?', [winnerId ?? null, game.id]);
 
   if (ranked.length === 2) {
-    if (tie) {
-      await tx.execute('UPDATE users SET draws=draws+1 WHERE id IN (?,?)', [
-        ranked[0].user_id,
-        ranked[1].user_id,
-      ]);
-    } else {
-      await tx.execute('UPDATE users SET wins=wins+1 WHERE id=?', [winnerId]);
-      await tx.execute('UPDATE users SET losses=losses+1 WHERE id<>? AND id IN (?,?)', [
-        winnerId,
-        ranked[0].user_id,
-        ranked[1].user_id,
-      ]);
+    const humanIds = [Number(ranked[0].user_id), Number(ranked[1].user_id)].filter(
+      (id) => !botNames.has(id),
+    );
+    if (tie && humanIds.length > 0) {
+      await tx.execute('UPDATE users SET draws=draws+1 WHERE id IN (?,?)', humanIds);
+    } else if (!tie) {
+      if (!botNames.has(Number(winnerId))) {
+        await tx.execute('UPDATE users SET wins=wins+1 WHERE id=?', [winnerId]);
+      }
+      const loserIds = [Number(ranked[0].user_id), Number(ranked[1].user_id)].filter(
+        (id) => id !== Number(winnerId) && !botNames.has(id),
+      );
+      if (loserIds.length > 0) {
+        await tx.execute('UPDATE users SET losses=losses+1 WHERE id IN (?,?)', loserIds);
+      }
     }
   }
   return true;
@@ -561,16 +573,28 @@ export async function gameState(gameId: number, userId: number): Promise<Record<
   );
   if (!players.some((player) => Number(player.user_id) === userId)) throw forbidden();
 
-  const presence = await db.execute(
-    'UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?',
-    [userId],
-  );
-  if (!presence.affectedRows) {
+  // Throttle de présence : ne rafraîchir last_seen qu'une fois par minute maximum,
+  // afin d'éviter une écriture DB à chaque poll de l'état de partie.
+  const staleThreshold =
+    db.dialect === 'mysql'
+      ? 'DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 60 SECOND)'
+      : "DATETIME(CURRENT_TIMESTAMP,'-60 seconds')";
+  const recent = (
+    await db.query<Row>(`SELECT user_id FROM presence WHERE user_id=? AND last_seen<=${staleThreshold}`, [
+      userId,
+    ])
+  )[0];
+  const hasPresence = (
+    await db.query<Row>('SELECT user_id FROM presence WHERE user_id=?', [userId])
+  )[0];
+  if (!hasPresence) {
     try {
       await db.execute('INSERT INTO presence(user_id) VALUES(?)', [userId]);
     } catch {
       await db.execute('UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?', [userId]);
     }
+  } else if (recent) {
+    await db.execute('UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?', [userId]);
   }
 
   const moves = await db.query<Row & { words: string; placements: string }>(
@@ -646,7 +670,12 @@ async function maybePlayAi(gameId: number): Promise<void> {
   const name = (await db.query<Row>('SELECT username FROM users WHERE id=?', [bot.user_id]))[0]
     ?.username;
   if (typeof name !== 'string' || !name.startsWith('LexiBot-')) return;
-  if (game.mode === 'timer' && currentRemaining(game, bot) <= 0) return;
+  if (game.mode === 'timer' && currentRemaining(game, bot) <= 0) {
+    // Le bot a écoulé son temps : finaliser immédiatement plutôt que d'attendre
+    // la prochaine action du joueur humain.
+    await expireTimedOutGame(gameId);
+    return;
+  }
 
   const level = normalizedAiLevel(game.ai_level);
   const rack = parse<Tile[]>(bot.rack);

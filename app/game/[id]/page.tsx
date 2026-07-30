@@ -37,9 +37,14 @@ type State = {
 };
 
 function formatTime(seconds: number): string {
-  const safe = Math.max(0, seconds);
-  const minutes = Math.floor(safe / 60);
-  return `${minutes}:${String(safe % 60).padStart(2, '0')}`;
+  const safe = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
 export default function GamePage({ params }: { params: Promise<{ id: string }> }) {
@@ -74,7 +79,13 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     state.status === 'active' &&
     Number(state.current_player_id) === Number(me.user_id),
   );
-  const canAct = myTurn && !offline;
+    const canAct = myTurn && !offline;
+
+  // Refs vers les dernières versions de submit/act pour le gestionnaire de clavier.
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  const actRef = useRef(act);
+  actRef.current = act;
 
   const dragTileRef = useRef<Tile | null>(null);
   const touchGhostRef = useRef<HTMLDivElement | null>(null);
@@ -95,22 +106,83 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     }
   }, [gameUuid]);
 
+  // Polling adaptatif : rapide (2 s) pendant le tour adverse, lent (12 s) sinon.
+  // Suspendu quand l'onglet est caché. Backoff en cas de réseau dégradé.
+  const pollInterval = myTurn || finished ? 12_000 : 2_000;
+
   useEffect(() => {
     void load();
-    const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void load();
-    }, 5000);
+    let timer: number | undefined;
+    let backoff = 1000;
+    const schedule = (): void => {
+      timer = window.setTimeout(async () => {
+        if (document.visibilityState !== 'visible') {
+          schedule();
+          return;
+        }
+        try {
+          await load();
+          backoff = 1000;
+        } catch {
+          backoff = Math.min(backoff * 2, 30_000);
+        }
+        schedule();
+      }, pollInterval);
+    };
     const refresh = () => {
       if (document.visibilityState === 'visible') void load();
     };
     document.addEventListener('visibilitychange', refresh);
     window.addEventListener('online', refresh);
+    schedule();
     return () => {
-      window.clearInterval(poll);
+      if (timer) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', refresh);
       window.removeEventListener('online', refresh);
     };
-  }, [load]);
+  }, [load, pollInterval]);
+
+    // Raccourcis clavier (PC) : Entrée = Valider, Échap = Rappeler,
+  // P = Passer, E = Échanger, A = Abandonner (confirmation).
+  useEffect(() => {
+    function onKey(event: KeyboardEvent): void {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
+        return;
+      if (!canAct || finished || submitting) return;
+      switch (event.key) {
+        case 'Enter':
+          if (placements.length > 0) {
+            event.preventDefault();
+            void submitRef.current();
+          }
+          break;
+        case 'Escape':
+          if (placements.length > 0) {
+            event.preventDefault();
+            clearDraft();
+          }
+          break;
+        case 'p':
+        case 'P':
+          event.preventDefault();
+          void actRef.current('pass');
+          break;
+        case 'e':
+        case 'E':
+          event.preventDefault();
+          setExchangeMode((current) => !current);
+          setExchangeIds([]);
+          break;
+        case 'a':
+        case 'A':
+          event.preventDefault();
+          setConfirmResign(true);
+          break;
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canAct, finished, submitting, placements.length]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -130,6 +202,14 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     setPlacements([]);
     setSelected(null);
     setDraftVersion(null);
+  }
+
+  function recallTileAt(row: number, col: number): void {
+    setPlacements((current) => {
+      const next = current.filter((p) => !(p.row === row && p.col === col));
+      if (next.length === 0) setDraftVersion(null);
+      return next;
+    });
   }
 
   function choose(row: number, col: number, tileOverride?: Tile): void {
@@ -560,7 +640,13 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                     data-cell-row={rowIndex}
                     data-cell-col={colIndex}
                     className={`cell ${multiplier || ''} ${staged ? 'staged' : ''} ${hoverCell?.row === rowIndex && hoverCell?.col === colIndex ? 'drag-hover' : ''}`}
-                    onClick={() => choose(rowIndex, colIndex)}
+                    onClick={() => {
+                      const staged = placements.some(
+                        (p) => p.row === rowIndex && p.col === colIndex,
+                      );
+                      if (staged) recallTileAt(rowIndex, colIndex);
+                      else choose(rowIndex, colIndex);
+                    }}
                     disabled={!canAct || finished}
                     onDragOver={(event) => handleDragOver(rowIndex, colIndex, event)}
                     onDragEnter={() => handleDragEnter(rowIndex, colIndex)}
