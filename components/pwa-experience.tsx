@@ -98,8 +98,12 @@ export function PwaExperience(): React.JSX.Element | null {
           <button
             type="button"
             onClick={() => {
+              navigator.serviceWorker.addEventListener(
+                'controllerchange',
+                () => window.location.reload(),
+                { once: true },
+              );
               updateReady.postMessage({ type: 'SKIP_WAITING' });
-              window.location.reload();
             }}
           >
             Mettre à jour
