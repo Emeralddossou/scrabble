@@ -250,11 +250,30 @@ export function chooseAiMove(
   return pool[stableIndex(seed, pool.length)];
 }
 
+/**
+ * Pondération stratégique de l'equity selon le niveau de l'IA.
+ * - `expert` valorise fortement la qualité du chevalet restant et la défense
+ *   contre les ouvertures offertes à l'adversaire (jeu positionnel).
+ * - `hard` applique une pondération intermédiaire (bon équilibre score/stratégie).
+ * - Les autres niveaux (et le client de suggestions) utilisent la formule de base.
+ */
+function levelAwareEquity(
+  score: number,
+  leave: number,
+  exposure: number,
+  level?: AiLevel,
+): number {
+  if (level === 'expert') return score + leave * 1.4 - exposure * 1.8;
+  if (level === 'hard') return score + leave * 1.1 - exposure * 1.3;
+  return score + leave - exposure;
+}
+
 export async function suggestMoves(
   board: Board,
   rack: Tile[],
   limit = 24,
   budgetMs = 1200,
+  level?: AiLevel,
 ): Promise<Suggestion[]> {
   const dictionary = await getDictionary();
   const startedAt = Date.now();
@@ -278,8 +297,12 @@ export async function suggestMoves(
         .join('|');
       if (seen.has(moveKey)) continue;
       seen.add(moveKey);
-      const equity =
-        result.score + leaveValue(rack, placements) - exposurePenalty(board, placements);
+      const equity = levelAwareEquity(
+        result.score,
+        leaveValue(rack, placements),
+        exposurePenalty(board, placements),
+        level,
+      );
       suggestions.push({
         word: result.words.map((entry) => entry.word).join(', '),
         row: slot.row,

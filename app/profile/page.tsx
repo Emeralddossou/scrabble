@@ -19,6 +19,7 @@ type ProfileData = {
   };
   games: Array<{
     id: number;
+    uuid: string;
     status: 'active' | 'finished';
     mode: 'free' | 'timer';
     is_solo: number;
@@ -255,7 +256,9 @@ export default function ProfilePage(): React.JSX.Element {
                     className="history-row"
                     onClick={() =>
                       router.push(
-                        game.status === 'finished' ? `/replay/${game.id}` : `/game/${game.id}`,
+                        game.status === 'finished'
+                          ? `/replay/${game.uuid}`
+                          : `/game/${game.uuid}`,
                       )
                     }
                   >

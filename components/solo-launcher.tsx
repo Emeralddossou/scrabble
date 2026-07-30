@@ -18,8 +18,14 @@ const LEVELS = [
   },
   {
     value: 'hard',
+    label: 'Avancé',
+    description: 'Optimise le score et tient compte du chevalet restant et des ouvertures.',
+  },
+  {
+    value: 'expert',
     label: 'Expert',
-    description: 'Optimise le score, le chevalet restant et les ouvertures du plateau.',
+    description:
+      'Jeu positionnel d’élite : valorise le chevalet, verrouille le plateau et minimise les offres.',
   },
 ] as const;
 

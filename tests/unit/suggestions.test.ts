@@ -33,7 +33,7 @@ describe('moteur de suggestions solo', () => {
     ).toBe(true);
   });
 
-  it('réserve le meilleur choix stratégique au niveau expert', () => {
+  it('réserve le meilleur choix stratégique aux niveaux avancé et expert', () => {
     const highestScore = suggestion('MAX', 30, 18);
     const bestEquity = suggestion('LEAVE', 26, 42);
     const options = [highestScore, bestEquity, suggestion('OTHER', 12, 11)];
@@ -42,5 +42,25 @@ describe('moteur de suggestions solo', () => {
     expect(chooseAiMove(options, 'expert', 'seed')).toBe(bestEquity);
     expect(chooseAiMove(options, 'medium', 'seed')).toBeDefined();
     expect(chooseAiMove(options, 'easy', 'seed')).toBeDefined();
+  });
+
+  it('pondère différemment l’equity selon le niveau (expert plus défensif)', async () => {
+    const board = emptyBoard();
+    board[7][7] = { id: 'fixed-e', letter: 'E', points: 1 };
+    const rack = [
+      { id: 'r-a', letter: 'A', points: 1 },
+      { id: 'r-t', letter: 'T', points: 1 },
+      { id: 'r-r', letter: 'R', points: 1 },
+    ];
+    const base = await suggestMoves(board, rack, 30, 3000);
+    const expert = await suggestMoves(board, rack, 30, 3000, 'expert');
+    const hard = await suggestMoves(board, rack, 30, 3000, 'hard');
+    expect(base.length).toBeGreaterThan(0);
+    expect(expert.length).toBeGreaterThan(0);
+    expect(hard.length).toBeGreaterThan(0);
+    // Les classements diffèrent : l'expert et l'avancé ne partagent pas
+    // systématiquement le même meilleur coup, car la pondération change.
+    const topScore = (moves: typeof base) => moves[0]?.equity ?? 0;
+    expect(topScore(expert)).not.toEqual(topScore(hard));
   });
 });

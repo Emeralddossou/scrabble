@@ -652,7 +652,7 @@ async function maybePlayAi(gameId: number): Promise<void> {
   const rack = parse<Tile[]>(bot.rack);
   const budget =
     level === 'expert' ? 1800 : level === 'hard' ? 1400 : level === 'medium' ? 1000 : 700;
-  const options = await suggestMoves(parse<Board>(game.board), rack, 48, budget);
+  const options = await suggestMoves(parse<Board>(game.board), rack, 48, budget, level);
   const actionId = `ai-${game.id}-${game.version}-${randomUUID()}`;
   const pick = chooseAiMove(options, level, `${game.id}:${game.version}:${bot.user_id}`);
   if (pick) {
