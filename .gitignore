@@ -3,6 +3,7 @@
 .env.local
 .env.*.php
 /config/
+vercel.env
 
 # Database files
 data/scrabble.db
