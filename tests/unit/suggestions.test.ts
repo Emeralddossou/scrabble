@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { emptyBoard } from '@/domain/scrabble/rules';
 import type { Tile } from '@/domain/scrabble/types';
+import { chooseAiExchange } from '@/server/game/service';
 import type { Suggestion } from '@/server/game/suggestions';
-import { chooseAiMove, suggestMoves } from '@/server/game/suggestions';
+import { chooseAiMove, exposurePenalty, leaveValue, suggestMoves } from '@/server/game/suggestions';
 
 const suggestion = (word: string, score: number, equity: number): Suggestion => ({
   word,
@@ -63,5 +64,29 @@ describe('moteur de suggestions solo', () => {
     // systématiquement le même meilleur coup, car la pondération change.
     const topEquity = (moves: typeof base) => moves[0]?.equity ?? 0;
     expect(topEquity(expert)).not.toEqual(topEquity(hard));
+  });
+
+  it('préserve les jokers et échange en priorité les lettres difficiles', () => {
+    const rack: Tile[] = [
+      { id: 'q', letter: 'Q', points: 8 },
+      { id: 'x', letter: 'X', points: 10 },
+      { id: 'blank', letter: '*', points: 0, blank: true },
+      { id: 'e', letter: 'E', points: 1 },
+      { id: 'a', letter: 'A', points: 1 },
+    ];
+    const exchanged = chooseAiExchange(rack, 'expert');
+    expect(exchanged).toEqual(expect.arrayContaining(['q', 'x']));
+    expect(exchanged).not.toContain('blank');
+  });
+
+  it('évalue la valeur du chevalet et les ouvertures de manière stratégique', () => {
+    const blankLeave = leaveValue([{ id: 'blank', letter: '*', points: 0 }], []);
+    const qLeave = leaveValue([{ id: 'q', letter: 'Q', points: 8 }], []);
+    expect(blankLeave).toBeGreaterThan(qLeave);
+
+    const board = emptyBoard();
+    const nearTripleWord = exposurePenalty(board, [{ row: 0, col: 1, tileId: 'a', letter: 'A' }]);
+    const centre = exposurePenalty(board, [{ row: 7, col: 7, tileId: 'a', letter: 'A' }]);
+    expect(nearTripleWord).toBeGreaterThan(centre);
   });
 });

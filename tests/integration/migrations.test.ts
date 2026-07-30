@@ -8,7 +8,7 @@ describe('migrations SQLite', () => {
     process.env.DB_TYPE = 'sqlite';
     process.env.DATABASE_URL = `file:/tmp/scrabble-integration-${process.pid}-${Date.now()}.db`;
     const database = await createDatabase();
-    expect(await migrate(database)).toEqual([1, 2, 3, 4]);
+    expect(await migrate(database)).toEqual([1, 2, 3, 4, 5]);
     expect(await migrate(database)).toEqual([]);
     await database.execute('INSERT INTO users(username,email,password_hash) VALUES(?,?,?)', [
       'alice',

@@ -173,7 +173,7 @@ function placementsForSlot(
   return placements.length ? placements : null;
 }
 
-function leaveValue(rack: Tile[], placements: Placement[]): number {
+export function leaveValue(rack: Tile[], placements: Placement[]): number {
   const used = new Set(placements.map((placement) => placement.tileId));
   const leave = rack.filter((tile) => !used.has(tile.id));
   const vowels = leave.filter((tile) => 'AEIOUY'.includes(tile.letter)).length;
@@ -183,8 +183,8 @@ function leaveValue(rack: Tile[], placements: Placement[]): number {
     return result;
   }, {});
   const useful = leave.reduce((score, tile) => {
-    if (tile.letter === '*') return score + 8;
-    if ('ERSAITN'.includes(tile.letter)) return score + 1.6;
+    if (tile.letter === '*') return score + 14;
+    if ('ERSAITN'.includes(tile.letter)) return score + 1.8;
     if ('LODU'.includes(tile.letter)) return score + 0.8;
     if ('QJKWXYZ'.includes(tile.letter)) return score - 2.2;
     return score;
@@ -194,11 +194,12 @@ function leaveValue(rack: Tile[], placements: Placement[]): number {
     (penalty, count) => penalty + Math.max(0, count - 2),
     0,
   );
-  const qWithoutU = counts.Q && !counts.U ? 3 : 0;
-  return useful - balance - duplicates - qWithoutU;
+  const qWithoutU = counts.Q && !counts.U ? 4 : 0;
+  const pairs = (counts.QU ? 2.5 : 0) + (counts.C && counts.H ? 1.1 : 0) + (counts.E && counts.S ? 0.8 : 0);
+  return useful + pairs - balance - duplicates - qWithoutU;
 }
 
-function exposurePenalty(board: Board, placements: Placement[]): number {
+export function exposurePenalty(board: Board, placements: Placement[]): number {
   const occupied = new Set(placements.map(({ row, col }) => `${row}:${col}`));
   let penalty = 0;
   for (const placement of placements) {

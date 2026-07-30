@@ -81,6 +81,27 @@ button:disabled {
 .feedback-card label {
   color: var(--muted);
 }
+.error-screen {
+  grid-auto-flow: row;
+  justify-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+}
+.error-screen h1 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: clamp(2rem, 6vw, 4rem);
+}
+.button-link {
+  border-radius: 10px;
+  background: var(--lime);
+  color: #14200f;
+  padding: 11px 15px;
+  font-weight: 800;
+  text-decoration: none;
+}
 .quiet {
   background: #25332c;
   color: var(--ink);

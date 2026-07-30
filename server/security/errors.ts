@@ -13,3 +13,4 @@ export const unauthorized = (message = 'Authentification requise.') =>
   new AppError('UNAUTHORIZED', 401, message);
 export const conflict = (message: string) => new AppError('CONFLICT', 409, message);
 export const validationError = (message: string) => new AppError('VALIDATION_ERROR', 422, message);
+export const notFound = (message = 'Ressource introuvable.') => new AppError('NOT_FOUND', 404, message);

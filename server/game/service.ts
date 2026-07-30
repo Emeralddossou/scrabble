@@ -13,7 +13,7 @@ import type {
 import { getDb, type Database, type Row } from '@/server/db';
 import { getDictionary } from '@/server/game/dictionary';
 import { chooseAiMove, suggestMoves, type AiLevel } from '@/server/game/suggestions';
-import { conflict, forbidden, validationError } from '@/server/security/errors';
+import { conflict, forbidden, notFound, validationError } from '@/server/security/errors';
 
 type GameRow = Row & {
   id: number;
@@ -30,6 +30,8 @@ type GameRow = Row & {
   consecutive_scoreless: number;
   turn_started_at: string | Date;
   ai_level: string | null;
+  share_enabled: number;
+  share_token: string | null;
 };
 type PlayerRow = Row & {
   game_id: number;
@@ -563,15 +565,52 @@ export async function gameAction(input: {
   return outcome.response;
 }
 
-export async function gameState(gameId: number, userId: number): Promise<Record<string, unknown>> {
-  await expireTimedOutGame(gameId);
-  const db = await getDb();
+async function stateParts(
+  db: Database,
+  gameId: number,
+): Promise<{ game: GameRow; players: Array<PlayerRow & { username: string }>; moves: Array<Row & { words: string; placements: string }> }> {
   const game = (await db.query<GameRow>('SELECT * FROM games WHERE id=?', [gameId]))[0];
-  if (!game) throw validationError('Partie introuvable.');
+  if (!game) throw notFound('Partie introuvable.');
   const players = await db.query<PlayerRow & { username: string }>(
     `SELECT gp.*,u.username FROM game_players gp JOIN users u ON u.id=gp.user_id WHERE gp.game_id=? ORDER BY gp.turn_order`,
     [gameId],
   );
+  const moves = await db.query<Row & { words: string; placements: string }>(
+    `SELECT m.*,u.username FROM moves m LEFT JOIN users u ON u.id=m.user_id WHERE m.game_id=? ORDER BY m.id`,
+    [gameId],
+  );
+  return { game, players, moves };
+}
+
+function serializedState(
+  game: GameRow,
+  players: Array<PlayerRow & { username: string }>,
+  moves: Array<Row & { words: string; placements: string }>,
+  viewerId?: number,
+): Record<string, unknown> {
+  return {
+    ...game,
+    board: parse<Board>(game.board),
+    bag_count: parse<Tile[]>(game.bag).length,
+    server_time: new Date().toISOString(),
+    players: players.map((player) => ({
+      ...player,
+      time_remaining: currentRemaining(game, player),
+      rack: Number(player.user_id) === viewerId ? parse<Tile[]>(player.rack) : undefined,
+      rack_count: parse<Tile[]>(player.rack).length,
+    })),
+    moves: moves.map((move) => ({
+      ...move,
+      words: parse<WordScore[]>(move.words),
+      placements: parse<Placement[]>(move.placements),
+    })),
+  };
+}
+
+export async function gameState(gameId: number, userId: number): Promise<Record<string, unknown>> {
+  await expireTimedOutGame(gameId);
+  const db = await getDb();
+  const { game, players, moves } = await stateParts(db, gameId);
   if (!players.some((player) => Number(player.user_id) === userId)) throw forbidden();
 
   // Throttle de présence : ne rafraîchir last_seen qu'une fois par minute maximum,
@@ -598,27 +637,39 @@ export async function gameState(gameId: number, userId: number): Promise<Record<
     await db.execute('UPDATE presence SET last_seen=CURRENT_TIMESTAMP WHERE user_id=?', [userId]);
   }
 
-  const moves = await db.query<Row & { words: string; placements: string }>(
-    `SELECT m.*,u.username FROM moves m LEFT JOIN users u ON u.id=m.user_id WHERE m.game_id=? ORDER BY m.id`,
-    [gameId],
-  );
-  return {
-    ...game,
-    board: parse<Board>(game.board),
-    bag_count: parse<Tile[]>(game.bag).length,
-    server_time: new Date().toISOString(),
-    players: players.map((player) => ({
-      ...player,
-      time_remaining: currentRemaining(game, player),
-      rack: Number(player.user_id) === userId ? parse<Tile[]>(player.rack) : undefined,
-      rack_count: parse<Tile[]>(player.rack).length,
-    })),
-    moves: moves.map((move) => ({
-      ...move,
-      words: parse<WordScore[]>(move.words),
-      placements: parse<Placement[]>(move.placements),
-    })),
-  };
+  return serializedState(game, players, moves, userId);
+}
+
+export async function setReplaySharing(
+  gameId: number,
+  userId: number,
+  enabled: boolean,
+): Promise<{ enabled: boolean; token?: string }> {
+  const db = await getDb();
+  return db.transaction(async (tx) => {
+    const { game } = await gameAndPlayer(tx, gameId, userId);
+    if (game.status !== 'finished') throw conflict('Le replay ne peut être partagé qu’une fois la partie terminée.');
+    if (!enabled) {
+      await tx.execute('UPDATE games SET share_enabled=0 WHERE id=?', [gameId]);
+      return { enabled: false };
+    }
+    const token = String(game.share_token ?? '') || randomUUID();
+    await tx.execute('UPDATE games SET share_enabled=1,share_token=? WHERE id=?', [token, gameId]);
+    return { enabled: true, token };
+  });
+}
+
+export async function sharedReplayState(token: string): Promise<Record<string, unknown>> {
+  const db = await getDb();
+  const game = (
+    await db.query<GameRow>(
+      "SELECT * FROM games WHERE share_token=? AND share_enabled=1 AND status='finished'",
+      [token],
+    )
+  )[0];
+  if (!game) throw notFound('Ce replay partagé est indisponible.');
+  const { players, moves } = await stateParts(db, Number(game.id));
+  return serializedState(game, players, moves);
 }
 
 export async function suggestionsForGame(
@@ -633,12 +684,13 @@ export async function suggestionsForGame(
   return suggestMoves(parse<Board>(game.board), parse<Tile[]>(player.rack));
 }
 
-function chooseAiExchange(rack: Tile[], level: AiLevel): string[] {
+export function chooseAiExchange(rack: Tile[], level: AiLevel): string[] {
   const letterValue = (tile: Tile): number => {
-    if (tile.letter === '*') return 20;
-    if ('ERSAITN'.includes(tile.letter)) return 7;
+    if (tile.letter === '*') return 24;
+    if ('ERSAITN'.includes(tile.letter)) return 8;
     if ('LODU'.includes(tile.letter)) return 4;
-    if ('QJKWXYZ'.includes(tile.letter)) return -5;
+    if (tile.letter === 'Q') return rack.some((other) => other.letter === 'U') ? 1 : -7;
+    if ('JKWXYZ'.includes(tile.letter)) return -5;
     return 1;
   };
   const sorted = [...rack].sort((left, right) => letterValue(left) - letterValue(right));

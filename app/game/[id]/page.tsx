@@ -34,6 +34,7 @@ type State = {
   bag_count: number;
   is_solo: number;
   ai_level: string | null;
+  share_enabled: number;
   players: PlayerView[];
   moves: MoveView[];
 };
@@ -676,6 +677,33 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     }
   }
 
+  async function toggleReplaySharing(): Promise<void> {
+    if (!state || !finished) return;
+    setSubmitting(true);
+    try {
+      const result = await api<{ enabled: boolean; sharePath?: string }>(`/api/games/${gameUuid}/share`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled: !Number(state.share_enabled) }),
+      });
+      if (result.enabled && result.sharePath) {
+        const url = new URL(result.sharePath, window.location.origin).href;
+        try {
+          await navigator.clipboard.writeText(url);
+          setMessage('Lien de replay partagé copié. Vous pouvez le désactiver à tout moment.');
+        } catch {
+          setMessage(`Lien de replay partagé : ${url}`);
+        }
+      } else {
+        setMessage('Le lien de replay partagé est désactivé.');
+      }
+      await load();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Impossible de modifier le partage.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (!state || !me) return <main className="center-screen">Installation des lettres…</main>;
 
   const elapsedSinceLoad = Math.max(0, Math.floor((now - receivedAt) / 1000));
@@ -811,6 +839,13 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 <h2>{winner ? `${winner.username} remporte la partie` : 'Partie nulle'}</h2>
                 <p>Motif : {state.end_reason ?? 'fin de partie'}</p>
                 <button onClick={() => router.push(`/replay/${gameUuid}`)}>Voir le replay</button>
+                <button
+                  className="quiet"
+                  disabled={submitting}
+                  onClick={() => void toggleReplaySharing()}
+                >
+                  {Number(state.share_enabled) ? 'Désactiver le partage' : 'Partager le replay'}
+                </button>
               </>
             ) : (
               <>

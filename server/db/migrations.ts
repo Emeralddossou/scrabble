@@ -162,6 +162,19 @@ const migrations: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 5,
+    sqlite: [
+      'ALTER TABLE games ADD COLUMN share_enabled INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE games ADD COLUMN share_token TEXT',
+      'CREATE UNIQUE INDEX games_share_token_index ON games(share_token)',
+    ],
+    mysql: [
+      'ALTER TABLE games ADD COLUMN share_enabled TINYINT NOT NULL DEFAULT 0',
+      'ALTER TABLE games ADD COLUMN share_token CHAR(36) NULL',
+      'CREATE UNIQUE INDEX games_share_token_index ON games(share_token)',
+    ],
+  },
 ];
 
 function resumableStatement(statement: string, dialect: Database['dialect']): string {
