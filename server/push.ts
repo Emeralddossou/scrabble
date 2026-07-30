@@ -7,6 +7,13 @@ type PushRow = {
   auth: string;
 };
 
+type DeliveryState = {
+  status: string;
+  createdAt: string;
+};
+
+const DELIVERY_LEASE_MS = 15 * 60 * 1000;
+
 export type PushSubscriptionInput = PushSubscription & {
   expirationTime?: number | null;
 };
@@ -52,6 +59,27 @@ export function localDateTime(
     date: `${value('year')}-${value('month')}-${value('day')}`,
     hour: Number(value('hour')),
   };
+}
+
+function sqlTimestamp(timestamp: string): number {
+  const normalized = /(?:Z|[+-]\d\d:\d\d)$/.test(timestamp)
+    ? timestamp
+    : `${timestamp.replace(' ', 'T')}Z`;
+  return Date.parse(normalized);
+}
+
+export function shouldClaimDailyDelivery(
+  notificationHour: number,
+  localHour: number,
+  delivery: DeliveryState | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!delivery) return localHour === notificationHour;
+  if (delivery.status === 'sent') return false;
+  if (delivery.status === 'failed') return true;
+  if (delivery.status !== 'pending') return false;
+  const claimedAt = sqlTimestamp(delivery.createdAt);
+  return !Number.isFinite(claimedAt) || now.getTime() - claimedAt >= DELIVERY_LEASE_MS;
 }
 
 export async function sendDailyReminder(subscription: PushRow): Promise<void> {

@@ -4,7 +4,13 @@ import { NextRequest } from 'next/server';
 
 import { getDb, type Row } from '@/server/db';
 import { failure, success } from '@/server/http';
-import { isValidTimeZone, localDateTime, pushErrorStatus, sendDailyReminder } from '@/server/push';
+import {
+  isValidTimeZone,
+  localDateTime,
+  pushErrorStatus,
+  sendDailyReminder,
+  shouldClaimDailyDelivery,
+} from '@/server/push';
 import { AppError } from '@/server/security/errors';
 
 export const runtime = 'nodejs';
@@ -17,6 +23,11 @@ type SubscriptionRow = Row & {
   auth: string;
   notification_hour: number;
   time_zone: string;
+};
+
+type DeliveryRow = Row & {
+  status: string;
+  created_at: string;
 };
 
 function cronAuthorized(request: NextRequest): boolean {
@@ -50,17 +61,34 @@ export async function GET(request: NextRequest) {
         continue;
       }
       const local = localDateTime(timeZone);
-      if (local.hour !== Number(subscription.notification_hour)) {
-        skipped += 1;
-        continue;
-      }
 
       const claimed = await db.transaction(async (tx) => {
-        const existing = await tx.query<Row>(
-          'SELECT id FROM push_deliveries WHERE subscription_id=? AND local_date=?',
-          [subscription.id, local.date],
-        );
-        if (existing[0]) return false;
+        const existing = (
+          await tx.query<DeliveryRow>(
+            'SELECT status,created_at FROM push_deliveries WHERE subscription_id=? AND local_date=?',
+            [subscription.id, local.date],
+          )
+        )[0];
+        if (
+          !shouldClaimDailyDelivery(
+            Number(subscription.notification_hour),
+            local.hour,
+            existing
+              ? { status: String(existing.status), createdAt: String(existing.created_at) }
+              : undefined,
+          )
+        ) {
+          return false;
+        }
+        if (existing) {
+          await tx.execute(
+            `UPDATE push_deliveries
+             SET status='pending',sent_at=NULL,created_at=CURRENT_TIMESTAMP
+             WHERE subscription_id=? AND local_date=?`,
+            [subscription.id, local.date],
+          );
+          return true;
+        }
         await tx.execute(
           `INSERT INTO push_deliveries(subscription_id,local_date,status) VALUES(?,?,'pending')`,
           [subscription.id, local.date],
