@@ -31,6 +31,7 @@ phpunit.xml
 
 # Node/NPM (if using frontend build tools)
 node_modules/
+.next/
 package-lock.json
 yarn.lock
 *.tsbuildinfo
