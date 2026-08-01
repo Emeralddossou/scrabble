@@ -39,6 +39,7 @@ export default function ReplayPage({
   const [state, setState] = useState<ReplayState | null>(null);
   const [index, setIndex] = useState(-1);
   const [playing, setPlaying] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     void api<ReplayState>(`/api/games/${gameUuid}`).then(setState);
@@ -68,11 +69,9 @@ export default function ReplayPage({
 
   if (!state || !board) return <main className="center-screen">Chargement du replay…</main>;
 
-    const selectedMove = index >= 0 ? state.moves[index] : null;
+  const selectedMove = index >= 0 ? state.moves[index] : null;
   const winner = state.players.find((player) => Number(player.user_id) === Number(state.winner_id));
-  const playedCells = new Set(
-    (selectedMove?.placements ?? []).map((p) => `${p.row}:${p.col}`),
-  );
+  const playedCells = new Set((selectedMove?.placements ?? []).map((p) => `${p.row}:${p.col}`));
 
   return (
     <main className="game-shell">
@@ -89,10 +88,16 @@ export default function ReplayPage({
             : 'Partie en cours'}
         </span>
       </header>
+      <section className="game-status replay-status" aria-live="polite">
+        <strong>{selectedMove ? (selectedMove.username ?? 'Système') : 'Début du replay'}</strong>
+        <span>
+          {index + 1} / {state.moves.length} coups
+        </span>
+      </section>
       <div className="game-grid">
         <section className="board-wrap">
           <div className="board" aria-label="Plateau du replay">
-                        {board.flatMap((row, rowIndex) =>
+            {board.flatMap((row, rowIndex) =>
               row.map((cell, colIndex) => (
                 <div
                   key={`${rowIndex}-${colIndex}`}
@@ -111,52 +116,64 @@ export default function ReplayPage({
             )}
           </div>
         </section>
-        <aside className="game-side">
-          <section className="side-card">
-            <h2>Coups</h2>
-            <p>
-              {index + 1} / {state.moves.length}
-            </p>
-            {selectedMove && (
-              <p className="notice">
-                {selectedMove.username ?? 'Système'} · {selectedMove.kind}
-                {selectedMove.words.length > 0
-                  ? ` · ${selectedMove.words.map((word) => word.word).join(', ')}`
-                  : ''}
+        <aside className={`game-side ${detailsOpen ? 'details-open' : ''}`}>
+          <button
+            type="button"
+            className="details-toggle quiet"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((current) => !current)}
+          >
+            {detailsOpen ? 'Masquer les détails' : 'Détails'}
+          </button>
+          <div className="details-panel">
+            <section className="side-card">
+              <h2>Coups</h2>
+              <p>
+                {index + 1} / {state.moves.length}
               </p>
-            )}
-            <div className="game-buttons">
-              <button onClick={() => setIndex(-1)}>Début</button>
-              <button
-                className="quiet"
-                onClick={() => setIndex((current) => Math.max(-1, current - 1))}
-              >
-                Précédent
-              </button>
-              <button
-                className="quiet"
-                onClick={() => setIndex((current) => Math.min(state.moves.length - 1, current + 1))}
-              >
-                Suivant
-              </button>
-              <button onClick={() => setPlaying((current) => !current)}>
-                {playing ? 'Pause' : 'Lecture'}
-              </button>
-            </div>
-          </section>
-          <section className="side-card history">
-            {state.moves.map((move, moveIndex) => (
-              <button className="game-row" key={move.id} onClick={() => setIndex(moveIndex)}>
-                <span>
-                  <b>{move.username ?? 'Système'}</b>
-                  <small>
-                    {move.kind} {move.words.map((word) => word.word).join(', ')}
-                  </small>
-                </span>
-                <strong>{move.points > 0 ? `+${move.points}` : '—'}</strong>
-              </button>
-            ))}
-          </section>
+              {selectedMove && (
+                <p className="notice">
+                  {selectedMove.username ?? 'Système'} · {selectedMove.kind}
+                  {selectedMove.words.length > 0
+                    ? ` · ${selectedMove.words.map((word) => word.word).join(', ')}`
+                    : ''}
+                </p>
+              )}
+              <div className="game-buttons">
+                <button onClick={() => setIndex(-1)}>Début</button>
+                <button
+                  className="quiet"
+                  onClick={() => setIndex((current) => Math.max(-1, current - 1))}
+                >
+                  Précédent
+                </button>
+                <button
+                  className="quiet"
+                  onClick={() =>
+                    setIndex((current) => Math.min(state.moves.length - 1, current + 1))
+                  }
+                >
+                  Suivant
+                </button>
+                <button onClick={() => setPlaying((current) => !current)}>
+                  {playing ? 'Pause' : 'Lecture'}
+                </button>
+              </div>
+            </section>
+            <section className="side-card history">
+              {state.moves.map((move, moveIndex) => (
+                <button className="game-row" key={move.id} onClick={() => setIndex(moveIndex)}>
+                  <span>
+                    <b>{move.username ?? 'Système'}</b>
+                    <small>
+                      {move.kind} {move.words.map((word) => word.word).join(', ')}
+                    </small>
+                  </span>
+                  <strong>{move.points > 0 ? `+${move.points}` : '—'}</strong>
+                </button>
+              ))}
+            </section>
+          </div>
         </aside>
       </div>
     </main>

@@ -36,6 +36,7 @@ export default function SharedReplayPage({
   const [state, setState] = useState<SharedReplay | null>(null);
   const [index, setIndex] = useState(-1);
   const [error, setError] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     void api<SharedReplay>(`/api/replays/shared/${token}`)
@@ -52,7 +53,8 @@ export default function SharedReplayPage({
     return emptyBoard();
   }, [index, state]);
 
-  if (!state) return <main className="center-screen">{error || 'Chargement du replay partagé…'}</main>;
+  if (!state)
+    return <main className="center-screen">{error || 'Chargement du replay partagé…'}</main>;
   const move = index >= 0 ? state.moves[index] : null;
   const playedCells = new Set((move?.placements ?? []).map((item) => `${item.row}:${item.col}`));
   const winner = state.players.find((player) => Number(player.user_id) === Number(state.winner_id));
@@ -64,6 +66,12 @@ export default function SharedReplayPage({
         <h1>Replay partagé</h1>
         <span>{winner ? `${winner.username} gagne` : 'Partie nulle'}</span>
       </header>
+      <section className="game-status replay-status" aria-live="polite">
+        <strong>{move ? (move.username ?? 'Système') : 'Début du replay'}</strong>
+        <span>
+          {index + 1} / {state.moves.length} coups
+        </span>
+      </section>
       <div className="game-grid">
         <section className="board-wrap" aria-label="Plateau du replay partagé">
           <div className="board">
@@ -86,33 +94,52 @@ export default function SharedReplayPage({
             )}
           </div>
         </section>
-        <aside className="game-side">
-          <section className="side-card">
-            <h2>{state.end_reason ?? 'Partie terminée'}</h2>
-            <p>
-              {index + 1} / {state.moves.length} coups
-            </p>
-            <div className="game-buttons">
-              <button onClick={() => setIndex(-1)}>Début</button>
-              <button className="quiet" onClick={() => setIndex((current) => Math.max(-1, current - 1))}>
-                Précédent
-              </button>
-              <button
-                className="quiet"
-                onClick={() => setIndex((current) => Math.min(state.moves.length - 1, current + 1))}
-              >
-                Suivant
-              </button>
-            </div>
-          </section>
-          <section className="side-card history">
-            {state.players.map((player) => (
-              <p key={player.user_id}>
-                <b>{player.username}</b> · {player.score} points
+        <aside className={`game-side ${detailsOpen ? 'details-open' : ''}`}>
+          <button
+            type="button"
+            className="details-toggle quiet"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((current) => !current)}
+          >
+            {detailsOpen ? 'Masquer les détails' : 'Détails'}
+          </button>
+          <div className="details-panel">
+            <section className="side-card">
+              <h2>{state.end_reason ?? 'Partie terminée'}</h2>
+              <p>
+                {index + 1} / {state.moves.length} coups
               </p>
-            ))}
-            {move && <p className="notice">{move.words.map((word) => word.word).join(', ') || move.kind}</p>}
-          </section>
+              <div className="game-buttons">
+                <button onClick={() => setIndex(-1)}>Début</button>
+                <button
+                  className="quiet"
+                  onClick={() => setIndex((current) => Math.max(-1, current - 1))}
+                >
+                  Précédent
+                </button>
+                <button
+                  className="quiet"
+                  onClick={() =>
+                    setIndex((current) => Math.min(state.moves.length - 1, current + 1))
+                  }
+                >
+                  Suivant
+                </button>
+              </div>
+            </section>
+            <section className="side-card history">
+              {state.players.map((player) => (
+                <p key={player.user_id}>
+                  <b>{player.username}</b> · {player.score} points
+                </p>
+              ))}
+              {move && (
+                <p className="notice">
+                  {move.words.map((word) => word.word).join(', ') || move.kind}
+                </p>
+              )}
+            </section>
+          </div>
         </aside>
       </div>
     </main>

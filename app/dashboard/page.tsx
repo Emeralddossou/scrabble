@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { SoloLauncher } from '@/components/solo-launcher';
 import { cached, putCache, rpc } from '@/lib/client';
+import { usePwaInstall } from '@/lib/use-pwa';
 
 type InvitationSummary = {
   id: number;
@@ -44,6 +45,8 @@ export default function Dashboard() {
   const [increment, setIncrement] = useState(0);
   const [busyPlayerId, setBusyPlayerId] = useState<number | null>(null);
   const [quickSolo, setQuickSolo] = useState(false);
+  const [installMessage, setInstallMessage] = useState('');
+  const { isStandalone, requestInstall } = usePwaInstall();
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('quick') !== 'solo') return;
@@ -99,6 +102,23 @@ export default function Dashboard() {
     }
   }
 
+  async function installPwa(): Promise<void> {
+    const result = await requestInstall();
+    if (result === 'ios-help') {
+      setInstallMessage(
+        'Sur iPhone/iPad : ouvrez LexiForge dans Safari, puis Partager → Sur l’écran d’accueil.',
+      );
+    } else if (result === 'unavailable') {
+      setInstallMessage(
+        'L’installation est proposée par un navigateur compatible sur HTTPS (ou localhost). Vous pouvez aussi utiliser le menu du navigateur.',
+      );
+    } else if (result === 'dismissed') {
+      setInstallMessage('Installation non effectuée. Vous pourrez réessayer depuis ce bouton.');
+    } else if (result === 'accepted' || result === 'standalone') {
+      setInstallMessage('LexiForge est prête à être utilisée comme une application.');
+    }
+  }
+
   if (!data) return <main className="center-screen">Préparation de la table…</main>;
 
   return (
@@ -110,6 +130,14 @@ export default function Dashboard() {
           <p role="status">{error || 'La table est prête.'}</p>
         </div>
         <div className="header-actions">
+          <button
+            className="quiet"
+            type="button"
+            disabled={isStandalone}
+            onClick={() => void installPwa()}
+          >
+            {isStandalone ? 'Application installée' : 'Installer'}
+          </button>
           <SoloLauncher autoOpen={quickSolo} />
           <button className="quiet" onClick={() => router.push('/profile')}>
             Mon profil
@@ -125,6 +153,12 @@ export default function Dashboard() {
           </button>
         </div>
       </header>
+
+      {installMessage && (
+        <p className="install-help" role="status">
+          {installMessage}
+        </p>
+      )}
 
       <section className="stat-row">
         <article>

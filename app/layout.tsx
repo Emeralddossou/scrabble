@@ -16,7 +16,12 @@ export const metadata: Metadata = {
   },
   appleWebApp: { capable: true, title: 'LexiForge', statusBarStyle: 'black-translucent' },
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#101714' };
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#101714',
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (

@@ -1,8 +1,20 @@
-const CACHE = 'lexiforge-static-v3';
-const STATIC_ASSETS = ['/', '/offline'];
+const CACHE = 'lexiforge-static-v4';
+const STATIC_ASSETS = [
+  '/',
+  '/offline',
+  '/manifest.webmanifest',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/icon-maskable.png',
+];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(STATIC_ASSETS)));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(STATIC_ASSETS).catch(() => undefined))
+      .catch(() => undefined),
+  );
   self.skipWaiting();
 });
 
@@ -45,8 +57,10 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = new URL(event.notification.data?.url || '/dashboard?quick=solo', self.location.origin)
-    .href;
+  const targetUrl = new URL(
+    event.notification.data?.url || '/dashboard?quick=solo',
+    self.location.origin,
+  ).href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       const existing = clients.find((client) => client.url.startsWith(self.location.origin));

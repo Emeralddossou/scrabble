@@ -14,9 +14,11 @@
 html,
 body {
   margin: 0;
+  min-height: 100%;
   background: radial-gradient(circle at 20% 0, #1c3025, var(--bg) 38%);
   color: var(--ink);
   font-family: Inter, system-ui, sans-serif;
+  overflow-x: clip;
 }
 button,
 input {
@@ -300,6 +302,7 @@ small {
 .game-shell {
   min-height: 100vh;
   padding-bottom: 150px;
+  overflow-x: clip;
 }
 .game-top {
   position: sticky;
@@ -310,12 +313,15 @@ small {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 24px;
+  gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 12px
+    max(24px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--line);
 }
 .scoreboard {
   display: flex;
   gap: 10px;
+  min-width: 0;
 }
 .scoreboard div {
   display: flex;
@@ -323,6 +329,7 @@ small {
   padding: 8px 12px;
   border-radius: 10px;
   color: var(--muted);
+  min-width: 0;
 }
 .scoreboard .turn {
   background: #233328;
@@ -330,17 +337,22 @@ small {
   box-shadow: inset 3px 0 var(--lime);
 }
 .network {
+  flex: 0 0 auto;
   font-size: 0.75rem;
   color: var(--lime);
 }
 .network.bad {
   color: var(--red);
 }
+.game-status {
+  display: none;
+}
 .game-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 24px;
   max-width: 1280px;
+  min-width: 0;
   margin: 24px auto;
   padding: 0 20px;
 }
@@ -348,24 +360,31 @@ small {
   overflow: auto;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  min-width: 0;
+  min-height: 0;
 }
 .board {
   display: grid;
   grid-template-columns: repeat(15, 1fr);
-  width: min(82vh, 900px, 94vw);
+  width: min(82dvh, 900px, 94vw);
+  max-width: 100%;
   aspect-ratio: 1;
+  flex: 0 0 auto;
   background: #17221c;
   border: 8px solid #715334;
   box-shadow: 0 20px 60px #0008;
 }
 .cell {
   position: relative;
+  min-width: 0;
   padding: 0;
   border: 1px solid #26382e;
   border-radius: 0;
   background: #132019;
   color: #6f8276;
   font-size: 0.62rem;
+  touch-action: none;
 }
 .cell.TW {
   background: #6d322d;
@@ -430,12 +449,10 @@ small {
   z-index: 2;
   transform: scale(1.05);
 }
-
 .cell.played {
   outline: 2px solid var(--lime);
   z-index: 1;
 }
-
 .cell.played strong {
   color: var(--gold);
   text-shadow: 0 0 6px var(--lime);
@@ -447,6 +464,17 @@ small {
   display: grid;
   gap: 16px;
   align-content: start;
+  min-width: 0;
+  min-height: 0;
+}
+.details-toggle {
+  display: none;
+}
+.details-panel {
+  display: contents;
+}
+.game-side-message {
+  grid-column: 1 / -1;
 }
 .side-card {
   padding: 18px;
@@ -472,7 +500,8 @@ small {
   background: #0b100ef2;
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--line);
-  padding: 14px;
+  padding: 14px max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
   display: flex;
   justify-content: center;
   gap: 22px;
@@ -486,8 +515,8 @@ small {
   border-radius: 10px;
 }
 .rack button {
-  width: clamp(38px, calc(82vh / 15), 60px);
-  height: clamp(38px, calc(82vh / 15), 60px);
+  width: clamp(38px, calc(82dvh / 15), 60px);
+  height: clamp(38px, calc(82dvh / 15), 60px);
   position: relative;
   padding: 0;
   border-radius: 6px;
@@ -522,7 +551,9 @@ button.submitting::after {
   animation: btn-spin 0.55s linear infinite;
 }
 @keyframes btn-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .draft-score {
   margin-top: 8px;
@@ -531,6 +562,14 @@ button.submitting::after {
 }
 .draft-score strong {
   font-size: 1.15rem;
+}
+.install-help {
+  margin: 14px 0 -10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: #141d19;
 }
 .center-screen {
   min-height: 100vh;
@@ -542,26 +581,207 @@ button.submitting::after {
     grid-template-columns: 1fr;
     padding: 30px 20px;
   }
+  .game-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 0;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    overflow: hidden;
+    overflow-x: clip;
+  }
+  .game-top {
+    position: relative;
+    gap: 6px;
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px
+      max(8px, env(safe-area-inset-left));
+  }
+  .game-top > button {
+    flex: 0 0 auto;
+    padding: 7px 9px;
+    font-size: 0.78rem;
+  }
+  .scoreboard {
+    flex: 1 1 auto;
+    justify-content: center;
+    gap: 3px;
+    overflow: hidden;
+  }
+  .scoreboard div {
+    gap: 5px;
+    padding: 5px 6px;
+    font-size: 0.75rem;
+    overflow: hidden;
+  }
+  .scoreboard div span {
+    max-width: 76px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .network {
+    font-size: 0.65rem;
+  }
+  .game-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+    min-height: 32px;
+    padding: 5px max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left));
+    border-bottom: 1px solid var(--line);
+    background: #141d19e8;
+    color: var(--muted);
+    font-size: 0.78rem;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .game-status > strong {
+    flex: 0 0 auto;
+    color: var(--ink);
+  }
+  .game-status .draft-score {
+    margin: 0;
+    font-size: inherit;
+    flex: 0 0 auto;
+  }
+  .game-status .draft-score strong {
+    font-size: inherit;
+  }
+  .game-status-message {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--gold);
+  }
   .game-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 4px;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0 8px;
+    overflow: hidden;
+  }
+  .board-wrap {
+    overflow: hidden;
+    align-items: flex-start;
+  }
+  .board {
+    width: min(calc(100dvh - 300px), calc(100vw - 16px));
+    max-width: 100%;
+    border-width: 4px;
+  }
+  .cell {
+    font-size: 0.7rem;
+  }
+  .cell strong {
+    font-size: clamp(0.72rem, 3.5vw, 1.25rem);
+  }
+  .cell small {
+    right: 2px;
+    bottom: 0;
+    font-size: clamp(0.48rem, 1.8vw, 0.72rem);
   }
   .game-side {
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .details-toggle {
+    display: block;
+    width: 100%;
+    flex: 0 0 auto;
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+  .details-panel {
+    display: none;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .game-side.details-open .details-panel {
+    display: grid;
+    gap: 8px;
+  }
+  .game-side-message {
+    display: none;
+  }
+  .side-card {
+    padding: 12px;
+    border-radius: 14px;
+  }
+  .history {
+    max-height: none;
+    min-height: 0;
   }
   .rack-dock {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
     align-items: stretch;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
   }
   .rack {
     justify-content: center;
-    overflow: auto;
+    gap: 3px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 5px;
+    overflow: hidden;
   }
-  .game-buttons {
+  .rack button {
+    width: min(calc((100vw - 32px) / 7), 52px);
+    height: min(calc((100vw - 32px) / 7), 52px);
+    border-radius: 5px;
+  }
+  .rack button.selected {
+    transform: translateY(-4px);
+  }
+  .rack strong {
+    font-size: clamp(0.95rem, 5vw, 1.35rem);
+  }
+  .rack small {
+    right: 2px;
+    font-size: 0.55rem;
+  }
+  .rack-dock .game-buttons {
+    width: 100%;
     justify-content: center;
+    gap: 4px;
   }
-  .game-shell {
-    padding-bottom: 260px;
+  .rack-dock .game-buttons button {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 7px 8px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  .rack-dock .game-buttons button:not(:first-child) {
+    padding-inline: 6px;
+    font-size: 0.72rem;
+  }
+  .pwa-notice {
+    top: max(8px, env(safe-area-inset-top));
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(460px, calc(100vw - 16px));
+    transform: translateX(-50%);
+  }
+  .pwa-notice-row {
+    padding: 9px 10px;
+    font-size: 0.78rem;
   }
   .dash-grid {
     grid-template-columns: 1fr;
@@ -570,24 +790,32 @@ button.submitting::after {
     grid-column: auto;
   }
 }
+@media (max-width: 900px) and (orientation: landscape) {
+  .board {
+    width: min(calc(100dvh - 160px), calc(100vw - 16px));
+  }
+  .rack-dock {
+    flex-direction: row;
+    align-items: center;
+  }
+  .rack-dock .game-buttons {
+    width: auto;
+    flex: 1 1 auto;
+  }
+}
 @media (max-width: 600px) {
   .dashboard > header {
     align-items: start;
     flex-direction: column;
   }
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
   .stat-row {
     overflow: auto;
   }
-  .game-top {
-    padding: 8px;
-  }
   .network {
     display: none;
-  }
-  .game-grid {
-    padding: 0 4px;
-  }
-  .game-side {
-    grid-template-columns: 1fr;
   }
 }

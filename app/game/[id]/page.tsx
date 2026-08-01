@@ -1,6 +1,14 @@
 'use client';
 
-import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
 
 import { multiplierAt } from '@/lib/board';
@@ -45,8 +53,18 @@ type Suggestion = {
   placements: Placement[];
 };
 type FeedbackPreferences = { sound: boolean; haptic: boolean };
+type DragSession = {
+  tile: Tile;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  dragging: boolean;
+  targetCell: { row: number; col: number } | null;
+  targetRackTileId: string | null;
+};
 
 const FEEDBACK_KEY = 'lexiforge-game-feedback';
+const DRAG_THRESHOLD = 8;
 
 function storedFeedback(): FeedbackPreferences {
   try {
@@ -114,6 +132,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [rackOrder, setRackOrder] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<FeedbackPreferences>({ sound: false, haptic: false });
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const me = useMemo(() => state?.players.find((player) => player.rack !== undefined), [state]);
   const finished = state?.status === 'finished';
@@ -123,7 +142,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     state.status === 'active' &&
     Number(state.current_player_id) === Number(me.user_id),
   );
-    const canAct = myTurn && !offline;
+  const canAct = myTurn && !offline;
 
   // Refs vers les dernières versions de submit/act pour le gestionnaire de clavier.
   const submitRef = useRef(submit);
@@ -131,11 +150,10 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const actRef = useRef(act);
   actRef.current = act;
 
-  const dragTileRef = useRef<Tile | null>(null);
-  const touchGhostRef = useRef<HTMLDivElement | null>(null);
-  const chooseRef = useRef<(row: number, col: number, tileOverride?: Tile) => void>(() => {});
-  const gameStateRef = useRef({ state: null as State | null, canAct: false, exchangeMode: false });
-  gameStateRef.current = { state, canAct, exchangeMode };
+  const boardRef = useRef<HTMLDivElement>(null);
+  const dragSessionRef = useRef<DragSession | null>(null);
+  const dragGhostRef = useRef<HTMLDivElement | null>(null);
+  const suppressRackClickRef = useRef(false);
 
   useEffect(() => setFeedback(storedFeedback()), []);
 
@@ -210,7 +228,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     };
   }, [load, pollInterval]);
 
-    // Raccourcis clavier (PC) : Entrée = Valider, Échap = Rappeler,
+  // Raccourcis clavier (PC) : Entrée = Valider, Échap = Rappeler,
   // P = Passer, E = Échanger, A = Abandonner (confirmation).
   useEffect(() => {
     function onKey(event: KeyboardEvent): void {
@@ -311,9 +329,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     setBlankRequest(null);
   }
 
-  // Keep chooseRef up-to-date for touch event handlers
-  chooseRef.current = choose;
-
   function selectRackTile(tile: Tile): void {
     if (!canAct) return;
     if (exchangeMode) {
@@ -340,81 +355,12 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     });
   }
 
-  /* ── Drag-and-drop (desktop) ────────────────────── */
-
-  function handleDragStart(tile: Tile, event: React.DragEvent): void {
-    if (!canAct || exchangeMode) return;
-    event.dataTransfer.setData('text/plain', tile.id);
-    event.dataTransfer.effectAllowed = 'move';
-    // custom transparent image so we keep our own visual
-    const blank = new Image();
-    blank.src =
-      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    event.dataTransfer.setDragImage(blank, 0, 0);
-    setSelected(tile);
-    setIsDragging(true);
-    dragTileRef.current = tile;
+  function removeDragGhost(): void {
+    dragGhostRef.current?.remove();
+    dragGhostRef.current = null;
   }
 
-  function handleDragOver(row: number, col: number, event: React.DragEvent): void {
-    if (!state || !dragTileRef.current || !canAct || state.board[row][col]) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }
-
-  function handleDragEnter(row: number, col: number): void {
-    if (!state || !dragTileRef.current || state.board[row][col]) return;
-    setHoverCell({ row, col });
-  }
-
-  function handleDragLeave(row: number, col: number): void {
-    setHoverCell((current) =>
-      current?.row === row && current?.col === col ? null : current,
-    );
-  }
-
-  function handleDrop(row: number, col: number, event: React.DragEvent): void {
-    event.preventDefault();
-    setIsDragging(false);
-    const tileId = event.dataTransfer.getData('text/plain');
-    const tile = (me?.rack ?? []).find((t) => t.id === tileId);
-    if (tile && state && !state.board[row][col]) {
-      choose(row, col, tile);
-    }
-    setHoverCell(null);
-    dragTileRef.current = null;
-  }
-
-  function handleDragEnd(): void {
-    setIsDragging(false);
-    setHoverCell(null);
-    dragTileRef.current = null;
-  }
-
-  function handleRackDragOver(event: React.DragEvent): void {
-    if (!dragTileRef.current || exchangeMode) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }
-
-  function handleRackDrop(targetId: string, event: React.DragEvent): void {
-    event.preventDefault();
-    const tileId = event.dataTransfer.getData('text/plain');
-    if (tileId) reorderRack(tileId, targetId);
-    handleDragEnd();
-  }
-
-  /* ── Touch drag-and-drop (mobile) ───────────────── */
-
-  function handleTouchStartTile(tile: Tile, event: React.TouchEvent): void {
-    if (!canAct || exchangeMode) return;
-    event.preventDefault();
-
-    setSelected(tile);
-    setIsDragging(true);
-    dragTileRef.current = tile;
-
-    const touch = event.touches[0];
+  function createDragGhost(tile: Tile, clientX: number, clientY: number): void {
     const ghost = document.createElement('div');
     ghost.className = 'drag-ghost';
     const ghostLetter = document.createElement('strong');
@@ -422,66 +368,141 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     const ghostScore = document.createElement('small');
     ghostScore.textContent = String(tile.blank ? 0 : tile.points);
     ghost.append(ghostLetter, ghostScore);
-    ghost.style.left = `${touch.clientX - 24}px`;
-    ghost.style.top = `${touch.clientY - 26}px`;
     document.body.appendChild(ghost);
-    touchGhostRef.current = ghost;
+    dragGhostRef.current = ghost;
+    updateDragGhost(clientX, clientY);
   }
 
-  /* Global touch-move / touch-end listeners (active only during a drag) */
-  useEffect(() => {
-    if (!isDragging) return;
+  function updateDragGhost(clientX: number, clientY: number): void {
+    if (!dragGhostRef.current) return;
+    dragGhostRef.current.style.left = `${clientX - 24}px`;
+    dragGhostRef.current.style.top = `${clientY - 26}px`;
+  }
 
-    const ghost = touchGhostRef.current;
-    if (!ghost) return;
-
-    const ghostEl = ghost;
-    let targetCell: { row: number; col: number } | null = null;
-    let targetRackTileId: string | null = null;
-
-    function onTouchMove(event: TouchEvent): void {
-      event.preventDefault();
-      const touch = event.touches[0];
-      ghostEl.style.left = `${touch.clientX - 24}px`;
-      ghostEl.style.top = `${touch.clientY - 26}px`;
-
-      const el = document.elementFromPoint(touch.clientX, touch.clientY);
-      const cell = el?.closest('[data-cell-row]') as HTMLElement | null;
-      const rackTile = el?.closest('[data-rack-tile]') as HTMLElement | null;
-      targetCell = cell
-        ? { row: Number(cell.dataset.cellRow), col: Number(cell.dataset.cellCol) }
-        : null;
-      targetRackTileId = rackTile?.dataset.rackTile ?? null;
+  function boardCellAtPoint(clientX: number, clientY: number): { row: number; col: number } | null {
+    const boardElement = boardRef.current;
+    if (!boardElement) return null;
+    const rect = boardElement.getBoundingClientRect();
+    if (
+      clientX < rect.left ||
+      clientX >= rect.right ||
+      clientY < rect.top ||
+      clientY >= rect.bottom ||
+      rect.width === 0 ||
+      rect.height === 0
+    ) {
+      return null;
     }
+    const col = Math.floor(((clientX - rect.left) / rect.width) * 15);
+    const row = Math.floor(((clientY - rect.top) / rect.height) * 15);
+    return row >= 0 && row < 15 && col >= 0 && col < 15 ? { row, col } : null;
+  }
 
-    function onTouchEnd(): void {
-      ghostEl.remove();
-      touchGhostRef.current = null;
+  function rackTileAtPoint(clientX: number, clientY: number): string | null {
+    const target = document.elementFromPoint(clientX, clientY);
+    const rackTile = target?.closest('[data-rack-tile]') as HTMLElement | null;
+    return rackTile?.dataset.rackTile ?? null;
+  }
 
-      if (targetCell && dragTileRef.current) {
-        const gs = gameStateRef.current;
-        const { row, col } = targetCell;
-        if (gs.state && !gs.state.board[row][col] && gs.canAct && !gs.exchangeMode) {
-          chooseRef.current(row, col, dragTileRef.current);
-        }
-      } else if (targetRackTileId && dragTileRef.current) {
-        reorderRack(dragTileRef.current.id, targetRackTileId);
-      }
+  function updateDragTarget(session: DragSession, clientX: number, clientY: number): void {
+    const cell = boardCellAtPoint(clientX, clientY);
+    session.targetCell = cell;
+    session.targetRackTileId = cell ? null : rackTileAtPoint(clientX, clientY);
+    setHoverCell((current) => {
+      const next = cell && state && !state.board[cell.row][cell.col] ? cell : null;
+      if (current?.row === next?.row && current?.col === next?.col) return current;
+      return next;
+    });
+  }
 
-      dragTileRef.current = null;
-      setIsDragging(false);
-      setSelected(null);
+  function handlePointerDown(tile: Tile, event: ReactPointerEvent<HTMLButtonElement>): void {
+    if (!canAct || finished || exchangeMode) return;
+    removeDragGhost();
+    setHoverCell(null);
+    suppressRackClickRef.current = false;
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Certains navigateurs refusent la capture si le pointeur a déjà été annulé.
     }
-
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend', onTouchEnd);
-    document.addEventListener('touchcancel', onTouchEnd);
-    return () => {
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend', onTouchEnd);
-      document.removeEventListener('touchcancel', onTouchEnd);
+    dragSessionRef.current = {
+      tile,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      targetCell: null,
+      targetRackTileId: null,
     };
-  }, [isDragging]);
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLButtonElement>): void {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    if (!session.dragging) {
+      if (distance <= DRAG_THRESHOLD) return;
+      session.dragging = true;
+      setIsDragging(true);
+      setSelected(session.tile);
+      createDragGhost(session.tile, event.clientX, event.clientY);
+    }
+    updateDragGhost(event.clientX, event.clientY);
+    updateDragTarget(session, event.clientX, event.clientY);
+  }
+
+  function finishPointerInteraction(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    cancelled = false,
+  ): void {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const wasDragging = session.dragging;
+    if (wasDragging && !cancelled) {
+      const { targetCell, targetRackTileId, tile } = session;
+      if (
+        targetCell &&
+        state &&
+        !state.board[targetCell.row][targetCell.col] &&
+        canAct &&
+        !exchangeMode
+      ) {
+        choose(targetCell.row, targetCell.col, tile);
+      } else if (!targetCell && targetRackTileId && !exchangeMode) {
+        reorderRack(tile.id, targetRackTileId);
+      }
+    }
+    if (wasDragging) {
+      setSelected(null);
+      suppressRackClickRef.current = true;
+      window.setTimeout(() => {
+        suppressRackClickRef.current = false;
+      }, 0);
+    }
+    removeDragGhost();
+    setHoverCell(null);
+    setIsDragging(false);
+    dragSessionRef.current = null;
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // La capture peut déjà avoir été libérée par le navigateur.
+    }
+  }
+
+  function handlePointerUp(event: ReactPointerEvent<HTMLButtonElement>): void {
+    finishPointerInteraction(event);
+  }
+
+  function handleRackClick(tile: Tile): void {
+    if (suppressRackClickRef.current) {
+      suppressRackClickRef.current = false;
+      return;
+    }
+    selectRackTile(tile);
+  }
 
   function estimateDraftScore(): number {
     if (!state || placements.length === 0 || !me) return 0;
@@ -681,10 +702,13 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     if (!state || !finished) return;
     setSubmitting(true);
     try {
-      const result = await api<{ enabled: boolean; sharePath?: string }>(`/api/games/${gameUuid}/share`, {
-        method: 'POST',
-        body: JSON.stringify({ enabled: !Number(state.share_enabled) }),
-      });
+      const result = await api<{ enabled: boolean; sharePath?: string }>(
+        `/api/games/${gameUuid}/share`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ enabled: !Number(state.share_enabled) }),
+        },
+      );
       if (result.enabled && result.sharePath) {
         const url = new URL(result.sharePath, window.location.origin).href;
         try {
@@ -735,7 +759,8 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     try {
       const result = await api<{ suggestions: Suggestion[] }>(`/api/games/${gameUuid}/suggestions`);
       setSuggestions(result.suggestions);
-      if (!result.suggestions.length) setMessage('Aucun coup légal n’a été trouvé pour ce chevalet.');
+      if (!result.suggestions.length)
+        setMessage('Aucun coup légal n’a été trouvé pour ce chevalet.');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Les suggestions sont indisponibles.');
     } finally {
@@ -748,7 +773,9 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     setDraftVersion(state.version);
     setPlacements(suggestion.placements);
     setSelected(null);
-    setMessage(`${suggestion.word} : +${suggestion.score} points. Vérifiez puis validez votre coup.`);
+    setMessage(
+      `${suggestion.word} : +${suggestion.score} points. Vérifiez puis validez votre coup.`,
+    );
   }
 
   return (
@@ -783,9 +810,26 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
         </span>
       </header>
 
+      <section className={`game-status ${finished ? 'finished' : ''}`} aria-live="polite">
+        <strong>
+          {finished ? 'Partie terminée' : myTurn ? 'À vous de composer' : 'Tour adverse'}
+        </strong>
+        {!finished && <span>{state.bag_count} lettres restantes</span>}
+        {myTurn && placements.length > 0 && (
+          <span className="draft-score">
+            Coup en cours : <strong>≈ +{estimateDraftScore()}</strong>
+          </span>
+        )}
+        {message && (
+          <span className="game-status-message" role="status">
+            {message}
+          </span>
+        )}
+      </section>
+
       <div className="game-grid">
         <section className="board-wrap" aria-label="Plateau de Scrabble">
-          <div className="board">
+          <div className="board" ref={boardRef}>
             {board.flatMap((row, rowIndex) =>
               row.map((cell, colIndex) => {
                 const multiplier = multiplierAt(rowIndex, colIndex);
@@ -806,10 +850,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                       else choose(rowIndex, colIndex);
                     }}
                     disabled={!canAct || finished}
-                    onDragOver={(event) => handleDragOver(rowIndex, colIndex, event)}
-                    onDragEnter={() => handleDragEnter(rowIndex, colIndex)}
-                    onDragLeave={() => handleDragLeave(rowIndex, colIndex)}
-                    onDrop={(event) => handleDrop(rowIndex, colIndex, event)}
                     aria-label={
                       cell
                         ? `${cell.letter}, ${cell.blank ? 0 : cell.points} point(s)`
@@ -831,11 +871,19 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
           </div>
         </section>
 
-        <aside className="game-side">
-          <div className="side-card">
-            <p className="eyebrow">ÉTAT DE LA PARTIE</p>
-            {finished ? (
-              <>
+        <aside className={`game-side ${detailsOpen ? 'details-open' : ''}`}>
+          <button
+            type="button"
+            className="details-toggle quiet"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((current) => !current)}
+          >
+            {detailsOpen ? 'Masquer les détails' : 'Détails'}
+          </button>
+          <div className="details-panel">
+            {finished && (
+              <div className="side-card">
+                <p className="eyebrow">ÉTAT DE LA PARTIE</p>
                 <h2>{winner ? `${winner.username} remporte la partie` : 'Partie nulle'}</h2>
                 <p>Motif : {state.end_reason ?? 'fin de partie'}</p>
                 <button onClick={() => router.push(`/replay/${gameUuid}`)}>Voir le replay</button>
@@ -846,92 +894,83 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 >
                   {Number(state.share_enabled) ? 'Désactiver le partage' : 'Partager le replay'}
                 </button>
-              </>
-            ) : (
-              <>
-                <h2>{myTurn ? 'À vous de composer' : 'Tour adverse'}</h2>
-                <p>{state.bag_count} lettres restantes</p>
-                {myTurn && placements.length > 0 && (
-                  <p className="draft-score">
-                    Coup en cours : <strong>≈ +{estimateDraftScore()}</strong>{' '}
-                    <small>estimation (validation serveur)</small>
-                  </p>
-                )}
-              </>
+              </div>
             )}
+            <div className="side-card history">
+              <h3>Historique</h3>
+              {state.moves
+                .slice()
+                .reverse()
+                .map((move) => (
+                  <div key={move.id}>
+                    <b>{move.username || 'Système'}</b>
+                    <span>
+                      {move.kind === 'play'
+                        ? `${move.words.map((word) => word.word).join(', ')} · +${move.points}`
+                        : move.kind}
+                    </span>
+                  </div>
+                ))}
+            </div>
+            {Number(state.is_solo) === 1 && myTurn && !finished && (
+              <div className="side-card training-card">
+                <p className="eyebrow">ENTRAÎNEMENT SOLO</p>
+                <h3>Besoin d’un indice ?</h3>
+                <p>Les propositions restent privées à cette partie contre l’IA.</p>
+                <button
+                  type="button"
+                  className="quiet"
+                  disabled={suggestionsLoading || submitting}
+                  onClick={() => void loadSuggestions()}
+                >
+                  {suggestionsLoading ? 'Recherche…' : 'Suggérer un coup'}
+                </button>
+                {suggestions.length > 0 && (
+                  <div className="suggestion-list" aria-live="polite">
+                    {suggestions.slice(0, 3).map((suggestion) => (
+                      <button
+                        type="button"
+                        className="suggestion-row"
+                        key={`${suggestion.word}:${suggestion.placements.map((item) => item.tileId).join('-')}`}
+                        onClick={() => previewSuggestion(suggestion)}
+                      >
+                        <span>
+                          <b>{suggestion.word}</b>
+                          <small>{suggestion.placements.length} lettre(s) posée(s)</small>
+                        </span>
+                        <strong>+{suggestion.score}</strong>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="side-card feedback-card">
+              <h3>Retours de jeu</h3>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={feedback.sound}
+                  onChange={(event) => updateFeedback({ ...feedback, sound: event.target.checked })}
+                />{' '}
+                Sons discrets
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={feedback.haptic}
+                  onChange={(event) =>
+                    updateFeedback({ ...feedback, haptic: event.target.checked })
+                  }
+                />{' '}
+                Vibration tactile
+              </label>
+            </div>
             {message && (
-              <p className="notice" role="status">
+              <p className="notice game-side-message" role="status">
                 {message}
               </p>
             )}
-          </div>
-          <div className="side-card history">
-            <h3>Historique</h3>
-            {state.moves
-              .slice()
-              .reverse()
-              .map((move) => (
-                <div key={move.id}>
-                  <b>{move.username || 'Système'}</b>
-                  <span>
-                    {move.kind === 'play'
-                      ? `${move.words.map((word) => word.word).join(', ')} · +${move.points}`
-                      : move.kind}
-                  </span>
-                </div>
-              ))}
-          </div>
-          {Number(state.is_solo) === 1 && myTurn && !finished && (
-            <div className="side-card training-card">
-              <p className="eyebrow">ENTRAÎNEMENT SOLO</p>
-              <h3>Besoin d’un indice ?</h3>
-              <p>Les propositions restent privées à cette partie contre l’IA.</p>
-              <button
-                type="button"
-                className="quiet"
-                disabled={suggestionsLoading || submitting}
-                onClick={() => void loadSuggestions()}
-              >
-                {suggestionsLoading ? 'Recherche…' : 'Suggérer un coup'}
-              </button>
-              {suggestions.length > 0 && (
-                <div className="suggestion-list" aria-live="polite">
-                  {suggestions.slice(0, 3).map((suggestion) => (
-                    <button
-                      type="button"
-                      className="suggestion-row"
-                      key={`${suggestion.word}:${suggestion.placements.map((item) => item.tileId).join('-')}`}
-                      onClick={() => previewSuggestion(suggestion)}
-                    >
-                      <span>
-                        <b>{suggestion.word}</b>
-                        <small>{suggestion.placements.length} lettre(s) posée(s)</small>
-                      </span>
-                      <strong>+{suggestion.score}</strong>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <div className="side-card feedback-card">
-            <h3>Retours de jeu</h3>
-            <label>
-              <input
-                type="checkbox"
-                checked={feedback.sound}
-                onChange={(event) => updateFeedback({ ...feedback, sound: event.target.checked })}
-              />{' '}
-              Sons discrets
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={feedback.haptic}
-                onChange={(event) => updateFeedback({ ...feedback, haptic: event.target.checked })}
-              />{' '}
-              Vibration tactile
-            </label>
           </div>
         </aside>
       </div>
@@ -945,14 +984,12 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
               <button
                 key={tile.id}
                 disabled={used || !canAct || finished}
-                className={`${selected?.id === tile.id || exchangeSelected ? 'selected' : ''} ${isDragging && dragTileRef.current?.id === tile.id ? 'dragging' : ''}`}
-                draggable={!used && canAct && !finished && !exchangeMode}
-                onClick={() => selectRackTile(tile)}
-                onDragStart={(event) => handleDragStart(tile, event)}
-                onDragEnd={handleDragEnd}
-                onDragOver={handleRackDragOver}
-                onDrop={(event) => handleRackDrop(tile.id, event)}
-                onTouchStart={(event) => handleTouchStartTile(tile, event)}
+                className={`${selected?.id === tile.id || exchangeSelected ? 'selected' : ''} ${isDragging && dragSessionRef.current?.tile.id === tile.id ? 'dragging' : ''}`}
+                onClick={() => handleRackClick(tile)}
+                onPointerDown={(event) => handlePointerDown(tile, event)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={(event) => finishPointerInteraction(event, true)}
                 onKeyDown={(event) => {
                   if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
                   event.preventDefault();
@@ -978,7 +1015,11 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
           >
             {submitting ? 'Validation…' : 'Valider'}
           </button>
-          <button className="quiet" onClick={clearDraft} disabled={placements.length === 0 || submitting}>
+          <button
+            className="quiet"
+            onClick={clearDraft}
+            disabled={placements.length === 0 || submitting}
+          >
             Rappeler
           </button>
           <button
@@ -1003,7 +1044,11 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
               Annuler l’échange
             </button>
           )}
-          <button className="quiet" onClick={() => void act('pass')} disabled={!canAct || finished || submitting}>
+          <button
+            className="quiet"
+            onClick={() => void act('pass')}
+            disabled={!canAct || finished || submitting}
+          >
             Passer
           </button>
           <button
